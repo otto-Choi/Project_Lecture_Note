@@ -41,6 +41,20 @@
   --safe-bot:    env(safe-area-inset-bottom, 0px);
 }
 
+body.dark {
+  --text:        #E5E7EB;
+  --text-soft:   #D1D5DB;
+  --muted:       #9CA3AF;
+  --border:      #374151;
+  --border-soft: #1F2937;
+  --bg:          #111827;
+  --surface:     #1F2937;
+  --blue-soft:   #1E3A5F;
+  --ok-soft:     #14532D;
+  --err-soft:    #7F1D1D;
+  --warn-soft:   #78350F;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body {
   height: 100%;

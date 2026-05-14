@@ -10,13 +10,9 @@
 //        - if running inside Capacitor (file:// or capacitor://) → production URL
 //        - if hostname is localhost / 127.0.0.1                 → http://localhost:8000
 //        - else → same-origin (empty string)
-const DEFAULT_PROD_API = 'https://lecturenote.up.railway.app';
+const DEFAULT_PROD_API = 'https://web-production-94071.up.railway.app';
 
 function resolveApiBase() {
-  const stored = localStorage.getItem('LN_API_BASE');
-  if (stored) return stored.replace(/\/+$/, '');
-  if (window.__LN_API_BASE__) return window.__LN_API_BASE__.replace(/\/+$/, '');
-
   const proto = location.protocol;
   const host  = location.hostname;
   if (proto === 'file:' || proto === 'capacitor:') return DEFAULT_PROD_API;
@@ -24,8 +20,8 @@ function resolveApiBase() {
   return '';
 }
 
-let API = resolveApiBase();
-window.LN = { get API() { return API; }, setAPI(u) { API = u.replace(/\/+$/, ''); localStorage.setItem('LN_API_BASE', API); } };
+const API = resolveApiBase();
+window.LN = { API };
 
 // ── Capacitor bridge (feature-detected) ────────────────────
 const isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -105,11 +101,6 @@ function showTab(id, viaBack) {
 window.showTab = showTab;
 
 function handleBackButton() {
-  // close sheet first
-  if ($('settings-sheet').classList.contains('show')) {
-    closeSettings();
-    return;
-  }
   // close result/edit if active in current tab
   if (currentTab === 'th' && $('th-note-edit').style.display === 'block') {
     cancelEditNote();
@@ -200,32 +191,18 @@ function hideLoad() {
   clearInterval(loadTimerId);
 }
 
-// ── Settings sheet (API URL) ───────────────────────────────
-function openSettings() {
-  $('settings-api').value = API;
-  $('settings-sheet').classList.add('show');
+// ── Dark mode ──────────────────────────────────────────────
+function applyDark(dark) {
+  document.body.classList.toggle('dark', dark);
+  $('icon-dark').style.display  = dark ? 'block' : 'none';
+  $('icon-light').style.display = dark ? 'none'  : 'block';
 }
-function closeSettings() { $('settings-sheet').classList.remove('show'); }
-function saveSettings() {
-  const v = $('settings-api').value.trim();
-  if (!v) { showToast('URL을 입력해주세요.', 'err'); return; }
-  window.LN.setAPI(v);
-  showToast('API URL이 저장되었습니다.', 'ok');
-  closeSettings();
-  // refresh lists
-  if (currentTab === 'tn') loadLectures();
-  if (currentTab === 'th') loadThLectures();
+function toggleDark() {
+  const next = !document.body.classList.contains('dark');
+  localStorage.setItem('LN_DARK', next ? '1' : '0');
+  applyDark(next);
 }
-function resetSettings() {
-  localStorage.removeItem('LN_API_BASE');
-  API = resolveApiBase();
-  $('settings-api').value = API;
-  showToast('기본값으로 복원됨', 'info');
-}
-window.openSettings = openSettings;
-window.closeSettings = closeSettings;
-window.saveSettings = saveSettings;
-window.resetSettings = resetSettings;
+window.toggleDark = toggleDark;
 
 // ── Error helpers ──────────────────────────────────────────
 function showErr(id, msg) { const el = $(id); el.textContent = msg; el.classList.add('show'); }
@@ -328,7 +305,7 @@ async function loadLectures() {
       </div>
     `).join('');
   } catch {
-    list.innerHTML = `<div class="lecture-empty">강의 목록을 불러오지 못했습니다.<br><span style="font-size:0.74rem">API URL을 확인해주세요 (우측 상단 ⚙)</span></div>`;
+    list.innerHTML = `<div class="lecture-empty">강의 목록을 불러오지 못했습니다.<br><span style="font-size:0.74rem">서버 연결을 확인해주세요.</span></div>`;
   }
 }
 window.loadLectures = loadLectures;
@@ -836,15 +813,11 @@ function init() {
 
   initNativeChrome();
 
+  // Restore dark mode preference
+  applyDark(localStorage.getItem('LN_DARK') === '1');
+
   // Hide boot splash after first paint
   setTimeout(() => $('boot-splash').classList.add('hide'), 350);
-
-  // Show current API URL hint if it's the demo default
-  if (API === DEFAULT_PROD_API && !localStorage.getItem('LN_API_BASE')) {
-    setTimeout(() => {
-      showToast('API URL: ' + API, 'info');
-    }, 1100);
-  }
 }
 
 if (document.readyState === 'loading') {
