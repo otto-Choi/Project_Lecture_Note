@@ -2,441 +2,134 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1A2D5E">
   <title>LectureNote</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <style>
-    :root {
-      --navy:   #1a1a2e;
-      --navy2:  #16213e;
-      --blue:   #0f3460;
-      --accent: #3a86ff;
-      --hover:  #2563eb;
-      --ok:     #10b981;
-      --err:    #ef4444;
-      --warn:   #f59e0b;
-      --text:   #1f2937;
-      --muted:  #6b7280;
-      --border: #e5e7eb;
-      --bg:     #f5f5f7;
-      --white:  #ffffff;
-      --nav-h:  64px;
-      --appbar-h: 56px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      height: 100%;
-      font-family: "Malgun Gothic", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #e8e8ed;
-      color: var(--text);
-    }
 
-    /* ── App shell ── */
-    #app {
-      max-width: 430px;
-      width: 100%;
-      margin: 0 auto;
-      min-height: 100vh;
-      background: var(--bg);
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 0 40px rgba(0,0,0,0.18);
-    }
+  <!-- Pretendard font (offline-friendly: cached after first launch) -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 
-    /* ── App bar ── */
-    .appbar {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--navy);
-      height: var(--appbar-h);
-      display: flex;
-      align-items: center;
-      padding: 0 18px;
-      gap: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .appbar-icon {
-      width: 32px; height: 32px;
-      background: var(--accent);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.1rem;
-    }
-    .appbar-title {
-      font-size: 1.1rem; font-weight: 700;
-      color: white; letter-spacing: -0.3px;
-    }
-    .appbar-title span { color: var(--accent); }
-    .appbar-page {
-      margin-left: auto;
-      font-size: 0.75rem; color: rgba(255,255,255,0.5);
-    }
+  <!-- App stylesheet -->
+  <link rel="stylesheet" href="assets/styles.css">
 
-    /* ── Scrollable content area ── */
-    .content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px 14px;
-      padding-bottom: calc(var(--nav-h) + 16px);
-    }
+  <!-- Inline-load the SVG icon sprite so <use href="#..."> works in WebView -->
+  <script>
+    fetch('assets/icons.svg').then(r => r.text()).then(t => {
+      const wrap = document.createElement('div');
+      wrap.style.display = 'none';
+      wrap.innerHTML = t;
+      document.body.insertBefore(wrap, document.body.firstChild);
+    }).catch(() => {});
+  </script>
 
-    /* ── Bottom navigation ── */
-    .bottom-nav {
-      position: sticky;
-      bottom: 0;
-      z-index: 100;
-      background: var(--white);
-      height: var(--nav-h);
-      display: flex;
-      border-top: 1px solid var(--border);
-      box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
-    }
-    .nav-btn {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 3px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 8px 4px;
-      transition: all 0.15s;
-      color: var(--muted);
-    }
-    .nav-btn.active { color: var(--accent); }
-    .nav-btn .nav-icon {
-      font-size: 1.3rem;
-      line-height: 1;
-    }
-    .nav-btn .nav-label {
-      font-size: 0.68rem;
-      font-family: inherit;
-      font-weight: 500;
-    }
-    .nav-btn.active .nav-label { font-weight: 700; }
+  <!-- Markdown + PDF (loaded from CDN; for offline-only builds, vendor these locally) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 
-    /* ── Card ── */
-    .card {
-      background: var(--white);
-      border-radius: 16px;
-      padding: 18px 16px;
-      margin-bottom: 12px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    }
-    .card-title {
-      font-size: 0.93rem; font-weight: 700; color: var(--navy);
-      margin-bottom: 14px;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .badge {
-      font-size: 0.62rem; padding: 2px 7px; border-radius: 20px;
-      font-weight: 700; letter-spacing: 0.04em;
-    }
-    .badge-required { background: var(--blue); color: white; }
-    .badge-optional { background: #e5e7eb; color: var(--muted); }
-
-    /* ── Form ── */
-    .form-group { margin-bottom: 12px; }
-    label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 5px; color: var(--text); }
-    input[type="text"], textarea {
-      width: 100%; padding: 11px 13px;
-      border: 1.5px solid var(--border); border-radius: 10px;
-      font-size: 0.88rem; font-family: inherit; color: var(--text);
-      background: white; transition: border-color 0.2s;
-    }
-    input:focus, textarea:focus {
-      outline: none; border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(58,134,255,0.12);
-    }
-    textarea { resize: vertical; min-height: 80px; }
-
-    /* ── File drop zone ── */
-    .drop-zone {
-      position: relative;
-      border: 2px dashed var(--border); border-radius: 12px;
-      padding: 28px 16px; text-align: center; cursor: pointer;
-      background: #fafafa; transition: all 0.2s;
-    }
-    .drop-zone:hover, .drop-zone.over { border-color: var(--accent); background: rgba(58,134,255,0.04); }
-    .drop-zone input[type="file"] {
-      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-    }
-    .drop-icon { font-size: 2rem; margin-bottom: 6px; }
-    .drop-text { font-size: 0.84rem; color: var(--text); font-weight: 500; }
-    .drop-hint { font-size: 0.74rem; color: var(--muted); margin-top: 4px; }
-    .file-chosen {
-      display: none; align-items: center; gap: 8px;
-      margin-top: 8px; padding: 8px 12px;
-      background: rgba(16,185,129,0.1); border-radius: 8px;
-      font-size: 0.8rem; color: var(--ok); font-weight: 500;
-    }
-
-    /* ── Recording ── */
-    .rec-box {
-      border: 1.5px solid var(--border); border-radius: 12px; padding: 14px;
-    }
-    .rec-label {
-      font-size: 0.7rem; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px;
-    }
-    .rec-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .or-line {
-      display: flex; align-items: center; gap: 10px;
-      margin: 12px 0; color: var(--muted); font-size: 0.76rem;
-    }
-    .or-line::before, .or-line::after { content:''; flex:1; height:1px; background:var(--border); }
-    .rec-timer {
-      font-variant-numeric: tabular-nums;
-      font-size: 1rem; font-weight: 700; color: var(--err); min-width: 50px;
-      display: none;
-    }
-    .rec-status { font-size: 0.8rem; color: var(--muted); }
-    .rec-result {
-      display: none; margin-top: 10px; padding: 8px 12px;
-      background: rgba(16,185,129,0.1); border-radius: 8px;
-      font-size: 0.8rem; color: var(--ok); font-weight: 500;
-    }
-
-    /* ── Buttons ── */
-    .btn {
-      padding: 11px 18px; border-radius: 12px; border: none;
-      font-size: 0.86rem; font-family: inherit; cursor: pointer;
-      transition: all 0.18s; font-weight: 600;
-      min-height: 44px;
-    }
-    .btn-primary {
-      background: var(--accent); color: white;
-      width: 100%; padding: 15px; font-size: 0.96rem; border-radius: 14px;
-      min-height: 52px;
-    }
-    .btn-primary:hover:not(:disabled) { background: var(--hover); }
-    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-    .btn-rec { background: var(--err); color: white; border-radius: 10px; }
-    .btn-rec:hover { background: #dc2626; }
-    .btn-rec.on { background: #991b1b; animation: pulse 1.5s infinite; }
-    .btn-stop { background: #4b5563; color: white; border-radius: 10px; display: none; }
-    .btn-stop:hover { background: #374151; }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.65; } }
-
-    /* ── Info / selected banner ── */
-    .info-banner {
-      display: none; align-items: center; gap: 10px;
-      background: rgba(58,134,255,0.08);
-      border: 1px solid rgba(58,134,255,0.25);
-      border-radius: 10px; padding: 10px 14px;
-      margin-bottom: 14px; font-size: 0.82rem; color: var(--hover);
-    }
-    .info-banner.show { display: flex; }
-    .selected-banner {
-      display: none; align-items: center; gap: 8px;
-      background: rgba(58,134,255,0.08); border: 1px solid rgba(58,134,255,0.25);
-      border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
-      font-size: 0.82rem; color: var(--hover);
-    }
-    .selected-banner.show { display: flex; }
-
-    /* ── Error ── */
-    .err-box {
-      display: none; margin-top: 10px; padding: 10px 14px;
-      background: #fef2f2; border: 1px solid #fecaca;
-      border-radius: 10px; color: var(--err); font-size: 0.82rem;
-    }
-    .err-box.show { display: block; }
-
-    /* ── Result panels ── */
-    .result-card { display: none; margin-top: 12px; }
-    .result-card.show { display: block; }
-    .result-head {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
-    }
-    .result-title {
-      font-size: 0.93rem; font-weight: 700; color: var(--navy);
-      display: flex; align-items: center; gap: 8px;
-    }
-    .ok-badge {
-      width: 22px; height: 22px; background: var(--ok); color: white;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-size: 0.72rem; flex-shrink: 0;
-    }
-    .meta-info { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; }
-    .btn-dl {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: var(--navy); color: white;
-      padding: 8px 14px; border-radius: 10px; border: none;
-      font-size: 0.8rem; font-family: inherit; cursor: pointer;
-      text-decoration: none; transition: background 0.2s; font-weight: 600;
-    }
-    .btn-dl:hover { background: var(--blue); }
-
-    /* ── Note content ── */
-    .note-view {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 10px; padding: 16px;
-      font-size: 0.85rem; line-height: 1.75;
-      overflow-wrap: break-word;
-      word-break: keep-all;
-      overflow-x: hidden;
-    }
-    .note-view h1 { font-size: 1.2em; color: var(--navy); margin: 1em 0 0.4em; border-bottom: 2px solid var(--border); padding-bottom: 4px; }
-    .note-view h2 { font-size: 1.05em; color: var(--navy); margin: 0.9em 0 0.3em; }
-    .note-view h3 { font-size: 0.95em; color: #374151; margin: 0.7em 0 0.25em; }
-    .note-view p  { margin: 0.35em 0; }
-    .note-view ul, .note-view ol { padding-left: 1.3em; margin: 0.3em 0; }
-    .note-view li { margin: 0.18em 0; }
-    .note-view table {
-      border-collapse: collapse; width: 100%; margin: 0.7em 0; font-size: 0.82em;
-      display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
-    }
-    .note-view th, .note-view td { border: 1px solid var(--border); padding: 5px 9px; text-align: left; white-space: nowrap; }
-    .note-view th { background: #f1f5f9; font-weight: 600; }
-    .note-view code { background: #e2e8f0; padding: 1px 4px; border-radius: 4px; font-size: 0.84em; word-break: break-all; }
-    .note-view pre  { background: #f1f5f9; padding: 10px; border-radius: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: pre; word-break: normal; }
-    .note-view blockquote { border-left: 3px solid var(--accent); padding-left: 10px; color: #4b5563; margin: 0.5em 0; }
-    .note-view hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
-
-    /* ── Loading overlay ── */
-    .loading-mask {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.5); z-index: 500;
-      align-items: center; justify-content: center;
-    }
-    .loading-mask.show { display: flex; }
-    .loading-box {
-      background: white; border-radius: 20px;
-      padding: 36px 32px; text-align: center;
-      width: min(340px, 88vw);
-    }
-    .spinner {
-      width: 46px; height: 46px;
-      border: 4px solid var(--border); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin 0.75s linear infinite;
-      margin: 0 auto 16px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .load-text { font-size: 0.93rem; font-weight: 700; color: var(--text); }
-    .load-sub  { font-size: 0.78rem; color: var(--muted); margin-top: 6px; min-height: 1.2em; }
-    .load-timer { font-size: 0.72rem; color: var(--muted); margin-top: 8px; font-variant-numeric: tabular-nums; }
-
-    /* ── Toast ── */
-    #toast {
-      position: fixed;
-      top: calc(var(--appbar-h) + 10px);
-      left: 50%; transform: translateX(-50%);
-      z-index: 600;
-      padding: 11px 20px;
-      border-radius: 24px;
-      font-size: 0.84rem; font-weight: 600;
-      white-space: nowrap;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-      max-width: 90vw; white-space: normal; text-align: center;
-    }
-    #toast.show { opacity: 1; }
-    #toast.ok   { background: var(--ok); color: white; }
-    #toast.err  { background: var(--err); color: white; }
-    #toast.info { background: var(--accent); color: white; }
-
-    /* ── Lecture & note lists ── */
-    .lecture-list { display: flex; flex-direction: column; gap: 8px; }
-    .lecture-card {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 14px; border-radius: 12px;
-      border: 1.5px solid var(--border); background: white;
-      cursor: pointer; transition: all 0.15s;
-    }
-    .lecture-card:hover { border-color: var(--accent); background: rgba(58,134,255,0.03); }
-    .lecture-card.selected { border-color: var(--accent); background: rgba(58,134,255,0.07); }
-    .lecture-card.selected .lc-title { color: var(--accent); }
-    .lc-body { flex: 1; min-width: 0; }
-    .lc-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
-    .lc-meta  { font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
-    .btn-del {
-      background: none; border: 1px solid #fecaca; color: var(--err);
-      border-radius: 8px; padding: 5px 10px; font-size: 0.72rem;
-      cursor: pointer; transition: all 0.15s; flex-shrink: 0; font-family: inherit; font-weight: 600;
-    }
-    .btn-del:hover { background: #fef2f2; }
-    .lecture-empty {
-      text-align: center; padding: 22px;
-      color: var(--muted); font-size: 0.84rem; line-height: 1.6;
-    }
-    .note-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 11px 14px; border-radius: 12px;
-      border: 1.5px solid var(--border); background: white;
-      cursor: pointer; transition: all 0.15s;
-    }
-    .note-item:hover { border-color: var(--accent); background: rgba(58,134,255,0.03); }
-    .note-item.selected { border-color: var(--accent); background: rgba(58,134,255,0.07); }
-    .note-item-body { flex: 1; }
-    .note-item-title { font-size: 0.86rem; font-weight: 700; color: var(--text); }
-    .note-item-meta  { font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
-  </style>
+  <!-- Compiled-in default API base (overridden by capacitor.config or Settings sheet) -->
+  <script>window.__LN_API_BASE__ = 'https://lecturenote.up.railway.app';</script>
 </head>
 <body>
+
+<!-- Boot splash (in-app, shown briefly while Capacitor native splash dismisses) -->
+<div class="boot-splash" id="boot-splash">
+  <div class="boot-logo">
+    <svg viewBox="0 0 48 48">
+      <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+      <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+      <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+      <rect x="14.5" y="17.5" width="6.5" height="1.2" fill="#fff" opacity="0.65"/>
+      <rect x="14.5" y="20.5" width="5.5" height="1.2" fill="#fff" opacity="0.65"/>
+      <rect x="14.5" y="23.5" width="6" height="1.2" fill="#fff" opacity="0.65"/>
+      <rect x="27.5" y="17.5" width="6.5" height="1.2" fill="#1A2D5E"/>
+      <rect x="27.5" y="20.5" width="5.5" height="1.2" fill="#6E6E73"/>
+      <rect x="27.5" y="23.5" width="6" height="1.2" fill="#6E6E73"/>
+    </svg>
+  </div>
+  <div class="boot-word">Lecture<em>Note</em></div>
+  <div class="boot-tag">멀티모달 강의 노트 파이프라인</div>
+  <div class="boot-dots"><span></span><span></span><span></span></div>
+</div>
+
 <div id="app">
 
-  <!-- App bar -->
-  <div class="appbar">
-    <div class="appbar-icon">📝</div>
-    <div class="appbar-title">Lecture<span>Note</span></div>
+  <!-- ─── App bar ────────────────────────────── -->
+  <header class="appbar">
+    <div class="appbar-logo">
+      <svg viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+        <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+        <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+        <rect x="14.5" y="17.5" width="6.5" height="1.2" fill="#fff" opacity="0.65"/>
+        <rect x="14.5" y="20.5" width="5.5" height="1.2" fill="#fff" opacity="0.65"/>
+        <rect x="27.5" y="17.5" width="6.5" height="1.2" fill="#1A2D5E"/>
+        <rect x="27.5" y="20.5" width="5.5" height="1.2" fill="#6E6E73"/>
+      </svg>
+    </div>
+    <div class="appbar-title">Lecture<em>Note</em></div>
     <div class="appbar-page" id="appbar-page">강의 등록</div>
-  </div>
+    <button class="appbar-action" onclick="openSettings()" aria-label="설정">
+      <svg><use href="#i-settings"/></svg>
+    </button>
+  </header>
 
-  <!-- Content area -->
-  <div class="content" id="content">
+  <!-- ─── Content ────────────────────────────── -->
+  <main class="content" id="content">
 
     <!-- ══════════ TAB 1: 강의 등록 ══════════ -->
-    <div id="tab-t0">
+    <section id="tab-t0">
 
       <div class="card">
         <div class="card-title">
           강의 등록
-          <span class="badge badge-required">STEP 0</span>
-          <span style="font-weight:400;color:var(--muted);font-size:0.8rem;margin-left:auto">학기 초 1회</span>
+          <span class="badge badge-required">Step 0</span>
+          <span class="card-title-suffix">학기 초 1회</span>
         </div>
 
         <div class="form-group">
           <label>강의계획서 (PDF 또는 TXT) *</label>
           <div class="drop-zone" id="dz-syllabus">
             <input type="file" id="f-syllabus" accept=".pdf,.txt">
-            <div class="drop-icon">📄</div>
-            <div class="drop-text">클릭하거나 파일을 드래그하세요</div>
-            <div class="drop-hint">PDF / TXT</div>
+            <div class="drop-icon"><svg><use href="#i-doc"/></svg></div>
+            <div class="drop-text">파일을 선택하거나 끌어다 놓으세요</div>
+            <div class="drop-hint">PDF · TXT</div>
           </div>
           <div class="file-chosen" id="fn-syllabus"></div>
         </div>
 
-        <button class="btn btn-primary" id="btn-t0" onclick="doStep0()">강의 등록하기 →</button>
+        <button class="btn btn-primary" id="btn-t0" onclick="doStep0()">
+          강의 등록하기
+          <svg><use href="#i-arrow-right"/></svg>
+        </button>
         <div class="err-box" id="err-t0"></div>
       </div>
 
       <div class="card result-card" id="res-t0">
         <div class="result-head">
-          <div class="result-title"><div class="ok-badge">✓</div>강의 등록 완료</div>
-          <button class="btn-dl" onclick="showTab('tn')">✏️ 노트 생성하기 →</button>
+          <div class="result-title">
+            <span class="ok-badge"><svg><use href="#i-check"/></svg></span>
+            강의 등록 완료
+          </div>
+          <button class="btn-action alt" onclick="showTab('tn')">
+            <svg><use href="#i-edit"/></svg>노트 생성
+          </button>
         </div>
         <div class="meta-info" id="meta-t0"></div>
         <div class="note-view" id="view-t0"></div>
       </div>
 
-    </div><!-- /tab-t0 -->
+    </section><!-- /tab-t0 -->
 
 
     <!-- ══════════ TAB 2: 노트 생성 ══════════ -->
-    <div id="tab-tn" style="display:none">
+    <section id="tab-tn" style="display:none">
 
       <div class="card">
         <div class="card-title">강의 선택</div>
         <div class="selected-banner" id="selected-banner">
-          ✓ 선택됨: <strong id="selected-name"></strong>
+          <svg><use href="#i-check"/></svg>
+          선택됨: <strong id="selected-name"></strong>
         </div>
         <div class="lecture-list" id="lecture-list">
           <div class="lecture-empty">불러오는 중...</div>
@@ -448,30 +141,36 @@
         <div class="rec-box">
           <div class="rec-label">앱 내 녹음 (원클릭)</div>
           <div class="rec-row">
-            <button class="btn btn-rec" id="btn-rec" onclick="startRec()">● 녹음 시작</button>
-            <button class="btn btn-stop" id="btn-stop" onclick="stopRec()">■ 중지</button>
+            <button class="btn btn-rec" id="btn-rec" onclick="startRec()">
+              <svg><use href="#i-mic-fill"/></svg>녹음 시작
+            </button>
+            <button class="btn btn-stop" id="btn-stop" onclick="stopRec()">
+              <svg><use href="#i-stop"/></svg>중지
+            </button>
             <span class="rec-timer" id="rec-timer">00:00</span>
             <span class="rec-status" id="rec-status"></span>
           </div>
           <div class="rec-result" id="rec-result"></div>
         </div>
+
         <div class="or-line">또는 파일 업로드</div>
+
         <div class="drop-zone" id="dz-audio">
           <input type="file" id="f-audio" accept="audio/*,.m4a,.mp3,.wav,.ogg,.webm">
-          <div class="drop-icon">🎙️</div>
+          <div class="drop-icon"><svg><use href="#i-mic"/></svg></div>
           <div class="drop-text">녹음 파일 업로드</div>
-          <div class="drop-hint">m4a, mp3, wav, webm 등</div>
+          <div class="drop-hint">m4a · mp3 · wav · webm</div>
         </div>
         <div class="file-chosen" id="fn-audio"></div>
       </div>
 
       <div class="card">
-        <div class="card-title">수업 자료 (PDF) <span class="badge badge-optional">선택</span></div>
+        <div class="card-title">수업 자료 <span class="badge badge-optional">선택</span></div>
         <div class="drop-zone" id="dz-pdf">
           <input type="file" id="f-pdf" accept=".pdf">
-          <div class="drop-icon">📑</div>
+          <div class="drop-icon"><svg><use href="#i-pdf"/></svg></div>
           <div class="drop-text">수업자료 PDF 업로드</div>
-          <div class="drop-hint">강의 슬라이드, 교재 PDF 등</div>
+          <div class="drop-hint">강의 슬라이드 · 교재 PDF</div>
         </div>
         <div class="file-chosen" id="fn-pdf"></div>
       </div>
@@ -482,33 +181,49 @@
       </div>
 
       <div class="card">
-        <div class="card-title">주차 설정</div>
-        <div class="form-group">
+        <div class="card-title">
+          <svg style="width:18px;height:18px;color:var(--blue)"><use href="#i-week"/></svg>
+          주차 설정
+        </div>
+        <div class="form-group" style="margin-bottom:0">
           <label>몇 주차 수업인가요?</label>
           <input type="number" id="tn-week" min="1" max="20" value="1" style="width:100px">
         </div>
       </div>
 
-      <button class="btn btn-primary" id="btn-gen" onclick="doGenNote()">노트 생성하기 →</button>
+      <button class="btn btn-primary" id="btn-gen" onclick="doGenNote()">
+        노트 생성하기
+        <svg><use href="#i-arrow-right"/></svg>
+      </button>
       <div class="err-box" id="err-tn"></div>
 
       <div class="card result-card" id="res-tn">
         <div class="result-head">
-          <div class="result-title"><div class="ok-badge" id="tn-ok-badge" style="display:none">✓</div><span id="tn-result-label">노트 생성 중...</span></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn-dl" id="btn-dl-tn" style="display:none" onclick="doDownload()">⬇ 다운로드</button>
-            <button class="btn-dl" id="btn-goto-th" style="display:none;background:var(--ok)" onclick="showTab('th')">📚 노트 조회 →</button>
+          <div class="result-title">
+            <span class="ok-badge" id="tn-ok-badge" style="display:none"><svg><use href="#i-check"/></svg></span>
+            <span id="tn-result-label">노트 생성 중...</span>
+          </div>
+          <div class="result-actions">
+            <button class="btn-action" id="btn-pdf-tn" style="display:none" onclick="exportCurrentNotePdf()">
+              <svg><use href="#i-pdf"/></svg>PDF
+            </button>
+            <button class="btn-action alt" id="btn-dl-tn" style="display:none" onclick="doDownload()">
+              <svg><use href="#i-download"/></svg>HTML
+            </button>
+            <button class="btn-action success" id="btn-goto-th" style="display:none" onclick="showTab('th')">
+              <svg><use href="#i-library"/></svg>조회
+            </button>
           </div>
         </div>
         <div class="meta-info" id="meta-tn"></div>
         <div class="note-view" id="view-tn"></div>
       </div>
 
-    </div><!-- /tab-tn -->
+    </section><!-- /tab-tn -->
 
 
     <!-- ══════════ TAB 3: 노트 조회 ══════════ -->
-    <div id="tab-th" style="display:none">
+    <section id="tab-th" style="display:none">
 
       <div class="card">
         <div class="card-title">강의 선택</div>
@@ -525,17 +240,24 @@
       <div class="card result-card" id="th-note-view-card">
         <div class="result-head">
           <div class="result-title" id="th-note-view-title">
-            <div class="ok-badge">✓</div>노트 내용
+            <span class="ok-badge"><svg><use href="#i-check"/></svg></span>
+            노트 내용
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn-dl" id="btn-edit-note" style="background:#6b7280" onclick="startEditNote()">✏️ 편집</button>
-            <button class="btn-dl" onclick="doDownloadTh()">⬇ 다운로드</button>
+          <div class="result-actions">
+            <button class="btn-action muted" id="btn-edit-note" onclick="startEditNote()">
+              <svg><use href="#i-pen"/></svg>편집
+            </button>
+            <button class="btn-action" onclick="exportThNotePdf()">
+              <svg><use href="#i-pdf"/></svg>PDF
+            </button>
+            <button class="btn-action alt" onclick="doDownloadTh()">
+              <svg><use href="#i-download"/></svg>HTML
+            </button>
           </div>
         </div>
         <div class="note-view" id="th-note-view"></div>
-        <!-- 편집 모드 -->
         <div id="th-note-edit" style="display:none;margin-top:10px">
-          <textarea id="th-note-textarea" style="width:100%;min-height:360px;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:0.85rem;font-family:inherit;line-height:1.7;resize:vertical"></textarea>
+          <textarea id="th-note-textarea" style="width:100%;min-height:360px;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:0.85rem;line-height:1.7;resize:vertical"></textarea>
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn btn-primary" style="flex:1" onclick="saveEditNote()">저장</button>
             <button class="btn" style="background:#e5e7eb;color:var(--text);flex:1" onclick="cancelEditNote()">취소</button>
@@ -543,580 +265,69 @@
         </div>
       </div>
 
-    </div><!-- /tab-th -->
+    </section><!-- /tab-th -->
 
-  </div><!-- /content -->
+  </main>
 
-  <!-- Bottom navigation -->
+  <!-- ─── Bottom navigation ──────────────────── -->
   <nav class="bottom-nav">
     <button class="nav-btn active" id="nav-t0" onclick="showTab('t0')">
-      <span class="nav-icon">📋</span>
+      <svg><use href="#i-clipboard"/></svg>
       <span class="nav-label">강의 등록</span>
     </button>
     <button class="nav-btn" id="nav-tn" onclick="showTab('tn')">
-      <span class="nav-icon">✏️</span>
+      <svg><use href="#i-edit"/></svg>
       <span class="nav-label">노트 생성</span>
     </button>
     <button class="nav-btn" id="nav-th" onclick="showTab('th')">
-      <span class="nav-icon">📚</span>
+      <svg><use href="#i-library"/></svg>
       <span class="nav-label">노트 조회</span>
     </button>
   </nav>
 
-</div><!-- /app -->
+</div><!-- /#app -->
 
-<!-- Loading overlay -->
+<!-- ─── Loading overlay (pipeline) ─────────────── -->
 <div class="loading-mask" id="loading">
   <div class="loading-box">
-    <div class="spinner"></div>
-    <div class="load-text" id="load-text">처리 중...</div>
-    <div class="load-sub"  id="load-sub"></div>
-    <div class="load-timer" id="load-timer"></div>
+    <div class="load-header">
+      <div class="load-logo">
+        <svg viewBox="0 0 48 48">
+          <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+          <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+          <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <div class="load-text" id="load-text">처리 중...</div>
+        <div class="load-sub" id="load-sub"></div>
+      </div>
+    </div>
+    <div class="load-steps" id="load-steps"></div>
+    <div class="load-timer" id="load-timer">경과 0초</div>
   </div>
 </div>
 
-<!-- Toast -->
+<!-- ─── Toast ──────────────────────────────────── -->
 <div id="toast"></div>
 
-<script>
-const API = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+<!-- ─── Settings sheet ────────────────────────── -->
+<div class="sheet-mask" id="settings-sheet" onclick="if(event.target===this)closeSettings()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">설정</div>
+    <div class="sheet-sub">백엔드 API 서버 주소를 입력하세요. 시연 환경(Railway 도메인, ngrok 터널, 같은 Wi-Fi의 PC IP 등)에 맞게 변경할 수 있습니다.</div>
+    <div class="form-group">
+      <label>API Base URL</label>
+      <input type="text" id="settings-api" placeholder="https://lecturenote.up.railway.app" autocomplete="off" autocapitalize="none" spellcheck="false">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn" style="background:var(--border-soft);color:var(--text)" onclick="resetSettings()">기본값</button>
+      <button class="btn btn-primary" style="min-height:44px;padding:11px;font-size:0.86rem;box-shadow:none" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
 
-// ── State ──────────────────────────────────────
-let gLectureId = null;
-let gOutputId  = null;
-let gRecBlob   = null;
-let gRecMime   = 'audio/webm';
-let mediaRec   = null;
-let recChunks  = [];
-let recTimerId = null;
-let recSecs    = 0;
-
-// Loading internals
-let loadElapsed    = 0;
-let loadTimerId    = null;
-let loadMsgIdx     = 0;
-let loadMsgTimer   = null;
-let loadMsgList    = [];
-
-// Tab labels for app bar
-const TAB_LABELS = { t0: '강의 등록', tn: '노트 생성', th: '노트 조회' };
-
-// ── Tab switch ─────────────────────────────────
-function showTab(id) {
-  ['t0','tn','th'].forEach(t => {
-    document.getElementById(`tab-${t}`).style.display = t === id ? 'block' : 'none';
-    document.getElementById(`nav-${t}`).classList.toggle('active', t === id);
-  });
-  document.getElementById('appbar-page').textContent = TAB_LABELS[id] || '';
-  if (id === 'tn') loadLectures();
-  if (id === 'th') loadThLectures();
-}
-
-// ── Toast ──────────────────────────────────────
-let toastTimer = null;
-function showToast(msg, type = 'info') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `show ${type}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.className = type; }, 3000);
-}
-
-// ── Browser notification ───────────────────────
-function requestNotifPerm() {
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
-}
-function sendNotif(title, body) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, { body, icon: '' });
-  }
-}
-
-// ── Loading helpers ────────────────────────────
-function showLoad(text, msgList) {
-  loadMsgList = msgList || [];
-  loadMsgIdx  = 0;
-  loadElapsed = 0;
-
-  document.getElementById('load-text').textContent = text;
-  document.getElementById('load-sub').textContent  = loadMsgList[0] || '';
-  document.getElementById('load-timer').textContent = '';
-  document.getElementById('loading').classList.add('show');
-
-  // Elapsed timer
-  clearInterval(loadTimerId);
-  loadTimerId = setInterval(() => {
-    loadElapsed++;
-    document.getElementById('load-timer').textContent = `경과 ${loadElapsed}초`;
-    if (loadElapsed === 120) {
-      document.getElementById('load-sub').textContent = '시간이 걸리고 있습니다. 잠시만 더 기다려주세요...';
-    }
-  }, 1000);
-
-  // Cycling messages
-  clearInterval(loadMsgTimer);
-  if (loadMsgList.length > 1) {
-    loadMsgTimer = setInterval(() => {
-      if (loadElapsed < 120) {
-        loadMsgIdx = (loadMsgIdx + 1) % loadMsgList.length;
-        document.getElementById('load-sub').textContent = loadMsgList[loadMsgIdx];
-      }
-    }, 10000);
-  }
-}
-
-function hideLoad() {
-  document.getElementById('loading').classList.remove('show');
-  clearInterval(loadTimerId);
-  clearInterval(loadMsgTimer);
-}
-
-// ── Error helpers ──────────────────────────────
-function showErr(id, msg) {
-  const el = document.getElementById(id); el.textContent = msg; el.classList.add('show');
-}
-function hideErr(id) { document.getElementById(id).classList.remove('show'); }
-
-// ── Markdown renderer ──────────────────────────
-function renderMd(el, text) {
-  if (window.marked) el.innerHTML = marked.parse(text || '');
-  else el.textContent = text || '';
-}
-
-// ── Lecture list (Tab 2) ───────────────────────
-async function loadLectures() {
-  const list = document.getElementById('lecture-list');
-  try {
-    const r = await fetch(`${API}/api/lectures`);
-    const lectures = await r.json();
-    if (!lectures.length) {
-      list.innerHTML = '<div class="lecture-empty">등록된 강의가 없습니다.<br>① 강의 등록 탭에서 강의계획서를 업로드하세요.</div>';
-      return;
-    }
-    list.innerHTML = lectures.map(l => `
-      <div class="lecture-card${gLectureId === l.id ? ' selected' : ''}" id="lc-${l.id}"
-           onclick="selectLecture(${l.id}, '${escHtml(l.title)}', '${escHtml(l.subject)}')">
-        <div class="lc-body">
-          <div class="lc-title">${escHtml(l.title)}</div>
-          <div class="lc-meta">${escHtml(l.subject)} · ID ${l.id} · ${l.created_at}</div>
-        </div>
-        <button class="btn-del" onclick="deleteLecture(event,${l.id})">삭제</button>
-      </div>
-    `).join('');
-  } catch {
-    list.innerHTML = '<div class="lecture-empty">강의 목록을 불러오지 못했습니다.</div>';
-  }
-}
-
-function selectLecture(id, title, subject) {
-  gLectureId = id;
-  document.querySelectorAll('#lecture-list .lecture-card').forEach(el => el.classList.remove('selected'));
-  const card = document.getElementById(`lc-${id}`);
-  if (card) card.classList.add('selected');
-  document.getElementById('selected-name').textContent = `${title}  (ID: ${id})`;
-  document.getElementById('selected-banner').classList.add('show');
-}
-
-async function deleteLecture(e, id) {
-  e.stopPropagation();
-  if (!confirm('이 강의와 연결된 모든 노트가 삭제됩니다. 계속할까요?')) return;
-  try {
-    await fetch(`${API}/api/lectures/${id}`, { method: 'DELETE' });
-    if (gLectureId === id) {
-      gLectureId = null;
-      document.getElementById('selected-banner').classList.remove('show');
-    }
-    loadLectures();
-    showToast('강의가 삭제되었습니다.', 'info');
-  } catch {
-    showToast('삭제 중 오류가 발생했습니다.', 'err');
-  }
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-// ── File inputs ────────────────────────────────
-function wireFile(inputId, displayId, dropId) {
-  const inp  = document.getElementById(inputId);
-  const disp = document.getElementById(displayId);
-  const dz   = document.getElementById(dropId);
-  inp.addEventListener('change', () => {
-    if (inp.files[0]) { disp.style.display = 'flex'; disp.textContent = '✓ ' + inp.files[0].name; }
-  });
-  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-  dz.addEventListener('drop', e => {
-    e.preventDefault(); dz.classList.remove('over');
-    if (e.dataTransfer.files[0]) {
-      inp.files = e.dataTransfer.files;
-      disp.style.display = 'flex'; disp.textContent = '✓ ' + e.dataTransfer.files[0].name;
-    }
-  });
-}
-wireFile('f-syllabus', 'fn-syllabus', 'dz-syllabus');
-wireFile('f-audio',    'fn-audio',    'dz-audio');
-wireFile('f-pdf',      'fn-pdf',      'dz-pdf');
-
-// ── STEP 0: Register lecture ───────────────────
-async function doStep0() {
-  hideErr('err-t0');
-  const file = document.getElementById('f-syllabus').files[0];
-  if (!file) { showErr('err-t0', '강의계획서 파일을 업로드해주세요.'); return; }
-
-  const fd = new FormData();
-  fd.append('syllabus_file', file);
-
-  showLoad('강의계획서 분석 중...', [
-    'Gemini AI가 커리큘럼을 파악하고 있습니다...',
-    '강의 일정 및 주제를 분석 중입니다...',
-    '과목명과 교수명을 추출 중입니다...',
-    '거의 다 됐습니다...',
-  ]);
-  document.getElementById('btn-t0').disabled = true;
-  try {
-    const r = await fetch(`${API}/api/create-step0`, { method: 'POST', body: fd });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `오류 ${r.status}`); }
-    const d = await r.json();
-
-    gLectureId = d.lecture_id;
-
-    const res = document.getElementById('res-t0');
-    res.classList.add('show');
-    document.getElementById('meta-t0').textContent = `✓ ${d.title}  /  ${d.subject}  (ID: ${d.lecture_id})`;
-    renderMd(document.getElementById('view-t0'), d.step0_analysis);
-    res.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    showToast(`✅ "${d.title}" 등록 완료!`, 'ok');
-    sendNotif('✅ 강의 등록 완료', `${d.title} 강의가 등록되었습니다.`);
-  } catch (e) {
-    showErr('err-t0', e.message || '요청 중 오류가 발생했습니다.');
-    showToast('등록 중 오류가 발생했습니다.', 'err');
-    sendNotif('❌ 오류 발생', e.message || '강의 등록에 실패했습니다.');
-  } finally {
-    hideLoad(); document.getElementById('btn-t0').disabled = false;
-  }
-}
-
-// ── STEP 2: Generate note (SSE streaming) ─────
-async function doGenNote() {
-  hideErr('err-tn');
-  const lid = gLectureId;
-  if (!lid) { showErr('err-tn', '위에서 강의를 먼저 선택해주세요.'); return; }
-
-  const fd = new FormData();
-  fd.append('lecture_id', lid);
-  const week = parseInt(document.getElementById('tn-week').value) || 1;
-  fd.append('week', week);
-
-  const pdfFile   = document.getElementById('f-pdf').files[0];
-  const audioFile = document.getElementById('f-audio').files[0];
-  const noteText  = document.getElementById('tn-note').value.trim();
-
-  if (pdfFile) fd.append('pdf_file', pdfFile);
-
-  let hasAudio = false;
-  if (gRecBlob) {
-    fd.append('audio_file', gRecBlob, 'recording.webm');
-    hasAudio = true;
-  } else if (audioFile) {
-    fd.append('audio_file', audioFile);
-    hasAudio = true;
-  }
-  if (noteText) fd.append('note_text', noteText);
-
-  const msgList = hasAudio
-    ? ['음성 파일 업로드 중...', 'Gemini STT 변환 중...', '강의 내용 분석 중...', '곧 노트가 시작됩니다...']
-    : ['자료 분석 중...', '내용 통합 중...', '곧 노트가 시작됩니다...'];
-
-  showLoad(hasAudio ? '음성 변환 중...' : '자료 처리 중...', msgList);
-  document.getElementById('btn-gen').disabled = true;
-
-  // 결과 카드 초기화
-  const res = document.getElementById('res-tn');
-  const viewEl = document.getElementById('view-tn');
-  document.getElementById('tn-ok-badge').style.display = 'none';
-  document.getElementById('tn-result-label').textContent = '노트 생성 중...';
-  document.getElementById('btn-dl-tn').style.display = 'none';
-  document.getElementById('btn-goto-th').style.display = 'none';
-  viewEl.innerHTML = '';
-  res.classList.remove('show');
-
-  let noteText2 = '';
-  let firstChunk = true;
-
-  try {
-    const r = await fetch(`${API}/api/generate-note`, { method: 'POST', body: fd });
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.detail || `오류 ${r.status}`);
-    }
-
-    const reader = r.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop(); // 마지막 미완성 라인은 버퍼에 보관
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        let d;
-        try { d = JSON.parse(line.slice(6)); } catch { continue; }
-
-        if (d.t === 'c') {
-          if (firstChunk) {
-            firstChunk = false;
-            hideLoad();
-            res.classList.add('show');
-            res.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-          noteText2 += d.v;
-          // 스트리밍 중: 텍스트 표시 (완료 후 마크다운 렌더링)
-          viewEl.style.whiteSpace = 'pre-wrap';
-          viewEl.textContent = noteText2;
-        } else if (d.t === 'd') {
-          gOutputId = d.id;
-          // 완료: 마크다운 렌더링으로 전환
-          viewEl.style.whiteSpace = '';
-          renderMd(viewEl, noteText2);
-          document.getElementById('meta-tn').textContent = `강의 ID: ${d.lid}  |  노트 ID: ${d.id}`;
-          document.getElementById('tn-ok-badge').style.display = 'flex';
-          document.getElementById('tn-result-label').textContent = '노트 생성 완료';
-          document.getElementById('btn-dl-tn').style.display = 'inline-flex';
-          document.getElementById('btn-goto-th').style.display = 'inline-flex';
-          showToast('✅ 노트 생성이 완료되었습니다!', 'ok');
-          sendNotif('✅ 노트 생성 완료', '생성된 노트를 지금 확인하세요.');
-        } else if (d.t === 'err') {
-          throw new Error(d.msg || '서버 오류');
-        }
-      }
-    }
-  } catch (e) {
-    hideLoad();
-    showErr('err-tn', e.message || '요청 중 오류가 발생했습니다.');
-    showToast('노트 생성 중 오류가 발생했습니다.', 'err');
-    sendNotif('❌ 오류 발생', e.message || '노트 생성에 실패했습니다.');
-  } finally {
-    hideLoad();
-    document.getElementById('btn-gen').disabled = false;
-  }
-}
-
-// ── Download ───────────────────────────────────
-function doDownload() {
-  if (!gOutputId) return;
-  window.open(`${API}/api/download-note/${gOutputId}`, '_blank');
-}
-
-// ── In-app Recording ───────────────────────────
-async function startRec() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recChunks = []; gRecBlob = null;
-
-    const mimes = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
-    gRecMime = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
-
-    mediaRec = new MediaRecorder(stream, gRecMime ? { mimeType: gRecMime } : {});
-    mediaRec.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
-    mediaRec.onstop = () => {
-      gRecBlob = new Blob(recChunks, { type: gRecMime || 'audio/webm' });
-      stream.getTracks().forEach(t => t.stop());
-      const kb = Math.round(gRecBlob.size / 1024);
-      const el = document.getElementById('rec-result');
-      el.style.display = 'block';
-      el.textContent = `✓ 녹음 완료 — ${fmtTime(recSecs)} (${kb} KB) — 생성 시 자동 업로드`;
-      document.getElementById('rec-status').textContent = '녹음 완료';
-    };
-    mediaRec.start(1000);
-
-    document.getElementById('btn-rec').style.display  = 'none';
-    document.getElementById('btn-stop').style.display = 'inline-block';
-    document.getElementById('rec-timer').style.display = 'inline';
-    document.getElementById('rec-status').textContent = '녹음 중...';
-
-    recSecs = 0;
-    recTimerId = setInterval(() => {
-      recSecs++;
-      document.getElementById('rec-timer').textContent = fmtTime(recSecs);
-    }, 1000);
-  } catch {
-    alert('마이크 접근 권한이 필요합니다. 브라우저 설정에서 허용해주세요.');
-  }
-}
-
-function stopRec() {
-  if (mediaRec && mediaRec.state !== 'inactive') mediaRec.stop();
-  clearInterval(recTimerId);
-  document.getElementById('btn-rec').style.display  = 'inline-block';
-  document.getElementById('btn-stop').style.display = 'none';
-  document.getElementById('rec-timer').style.display = 'none';
-}
-
-function fmtTime(s) {
-  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
-}
-
-// ── Tab 3: 노트 조회 ───────────────────────────
-let thLectureId = null;
-let thOutputId  = null;
-
-async function loadThLectures() {
-  const list = document.getElementById('th-lecture-list');
-  try {
-    const r = await fetch(`${API}/api/lectures`);
-    const lectures = await r.json();
-    if (!lectures.length) {
-      list.innerHTML = '<div class="lecture-empty">등록된 강의가 없습니다.</div>';
-      return;
-    }
-    list.innerHTML = lectures.map(l => `
-      <div class="lecture-card${thLectureId === l.id ? ' selected' : ''}" id="thlc-${l.id}"
-           onclick="loadThNotes(${l.id}, '${escHtml(l.title)}', '${escHtml(l.subject)}')">
-        <div class="lc-body">
-          <div class="lc-title">${escHtml(l.title)}</div>
-          <div class="lc-meta">${escHtml(l.subject)} · ${l.created_at}</div>
-        </div>
-      </div>
-    `).join('');
-  } catch {
-    list.innerHTML = '<div class="lecture-empty">목록을 불러오지 못했습니다.</div>';
-  }
-}
-
-async function loadThNotes(lectureId, title, subject) {
-  thLectureId = lectureId;
-  document.querySelectorAll('#th-lecture-list .lecture-card').forEach(el => el.classList.remove('selected'));
-  const card = document.getElementById(`thlc-${lectureId}`);
-  if (card) card.classList.add('selected');
-
-  const notesCard = document.getElementById('th-notes-card');
-  const notesList = document.getElementById('th-notes-list');
-  document.getElementById('th-notes-title').textContent = `${title} — 생성된 노트`;
-  notesCard.style.display = 'block';
-  notesList.innerHTML = '<div class="lecture-empty">불러오는 중...</div>';
-  document.getElementById('th-note-view-card').classList.remove('show');
-
-  try {
-    const r = await fetch(`${API}/api/lectures/${lectureId}/notes`);
-    const notes = await r.json();
-    if (!notes.length) {
-      notesList.innerHTML = '<div class="lecture-empty">아직 생성된 노트가 없습니다.</div>';
-      return;
-    }
-    notesList.innerHTML = notes.map((n, i) => {
-      const weekLabel = n.week ? `${n.week}주차` : `${i + 1}주차`;
-      return `
-      <div class="note-item${thOutputId === n.id ? ' selected' : ''}" id="thni-${n.id}"
-           onclick="loadThNote(${n.id}, '${weekLabel}')">
-        <div class="note-item-body">
-          <div class="note-item-title">${weekLabel} 노트</div>
-          <div class="note-item-meta">${n.created_at} · ID: ${n.id}</div>
-        </div>
-        <button class="btn-del" onclick="deleteNote(event, ${n.id})">삭제</button>
-      </div>`;
-    }).join('');
-  } catch {
-    notesList.innerHTML = '<div class="lecture-empty">노트 목록을 불러오지 못했습니다.</div>';
-  }
-}
-
-async function loadThNote(outputId, weekLabel) {
-  thOutputId = outputId;
-  document.querySelectorAll('#th-notes-list .note-item').forEach(el => el.classList.remove('selected'));
-  const item = document.getElementById(`thni-${outputId}`);
-  if (item) item.classList.add('selected');
-
-  showLoad('노트 불러오는 중...', ['서버에서 노트를 가져오고 있습니다...']);
-  try {
-    const r = await fetch(`${API}/api/notes/${outputId}`);
-    if (!r.ok) throw new Error();
-    const d = await r.json();
-    const viewCard = document.getElementById('th-note-view-card');
-    viewCard.classList.add('show');
-    document.getElementById('th-note-view-title').innerHTML =
-      `<div class="ok-badge">✓</div>${weekLabel} 노트 &nbsp;<span style="font-weight:400;font-size:0.78rem;color:var(--muted)">${d.created_at}</span>`;
-    document.getElementById('th-note-view').dataset.raw = d.note;
-    renderMd(document.getElementById('th-note-view'), d.note);
-    viewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch {
-    showToast('노트를 불러오지 못했습니다.', 'err');
-  } finally {
-    hideLoad();
-  }
-}
-
-function doDownloadTh() {
-  if (!thOutputId) return;
-  window.open(`${API}/api/download-note/${thOutputId}`, '_blank');
-}
-
-// ── 노트 삭제 (Tab 3) ──────────────────────────
-async function deleteNote(e, id) {
-  e.stopPropagation();
-  if (!confirm('이 노트를 삭제할까요?')) return;
-  try {
-    await fetch(`${API}/api/notes/${id}`, { method: 'DELETE' });
-    if (thOutputId === id) {
-      thOutputId = null;
-      document.getElementById('th-note-view-card').classList.remove('show');
-    }
-    loadThNotes(thLectureId,
-      document.getElementById('th-notes-title').textContent.replace(' — 생성된 노트', ''),
-      '');
-    showToast('노트가 삭제되었습니다.', 'info');
-  } catch {
-    showToast('삭제 중 오류가 발생했습니다.', 'err');
-  }
-}
-
-// ── 노트 편집 (Tab 3) ──────────────────────────
-function startEditNote() {
-  const raw = document.getElementById('th-note-view').dataset.raw || '';
-  document.getElementById('th-note-textarea').value = raw;
-  document.getElementById('th-note-view').style.display = 'none';
-  document.getElementById('th-note-edit').style.display = 'block';
-  document.getElementById('btn-edit-note').style.display = 'none';
-}
-
-function cancelEditNote() {
-  document.getElementById('th-note-view').style.display = '';
-  document.getElementById('th-note-edit').style.display = 'none';
-  document.getElementById('btn-edit-note').style.display = 'inline-flex';
-}
-
-async function saveEditNote() {
-  const newContent = document.getElementById('th-note-textarea').value.trim();
-  if (!newContent) return;
-  try {
-    const r = await fetch(`${API}/api/notes/${thOutputId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary: newContent }),
-    });
-    if (!r.ok) throw new Error();
-    const viewEl = document.getElementById('th-note-view');
-    viewEl.dataset.raw = newContent;
-    renderMd(viewEl, newContent);
-    cancelEditNote();
-    showToast('노트가 저장되었습니다.', 'ok');
-  } catch {
-    showToast('저장 중 오류가 발생했습니다.', 'err');
-  }
-}
-
-// ── Init ───────────────────────────────────────
-requestNotifPerm();
-</script>
-
+<script src="assets/app.js"></script>
 </body>
 </html>
