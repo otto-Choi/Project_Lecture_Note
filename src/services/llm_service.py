@@ -8,9 +8,9 @@ load_dotenv()
 
 _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-_PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
-_SYLLABUS_PROMPT_PATH = _PROJECT_ROOT / "project_plan" / "syllabus_analysis.md"
-_MAKE_NOTE_PROMPT_PATH = _PROJECT_ROOT / "project_plan" / "make_note.md"
+_PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+_SYLLABUS_PROMPT_PATH = _PROJECT_ROOT / "docs" / "planning" / "syllabus_analysis.md"
+_MAKE_NOTE_PROMPT_PATH = _PROJECT_ROOT / "docs" / "planning" / "make_note.md"
 
 _MODEL_ID = "gemini-2.5-flash"
 
