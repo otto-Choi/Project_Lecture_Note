@@ -268,6 +268,167 @@ uvicorn main:app --reload
 
 ---
 
+---
+
+## 8단계: STT 성능 최적화 (2026-05-15)
+
+### 문제
+STT (Gemini Audio API) 처리 시간이 ~53초로 너무 길다는 피드백.
+
+### 원인 분석
+1. Gemini 2.5-flash의 기본 설정은 Extended Thinking 활성화 — 단순 STT 작업에 불필요한 추론 토큰 소모
+2. PDF 파싱과 STT가 순차 처리 — 첫 번째가 끝난 뒤 두 번째 시작
+
+### 해결 1: `thinking_budget=0`
+
+`stt_service.py`의 STT 호출과 `llm_service.py`의 `extract_lecture_meta`에 thinking 비활성화 추가:
+```python
+config=types.GenerateContentConfig(
+    thinking_config=types.ThinkingConfig(thinking_budget=0),
+)
+```
+단순 변환/추출 작업에 Extended Thinking은 응답 시간만 늘릴 뿐 품질 향상이 없다.
+
+### 해결 2: `asyncio.gather` 병렬 처리
+
+`generate-note` 엔드포인트에서 PDF 파싱과 STT를 병렬 실행:
+```python
+pdf_text, stt_text = await asyncio.gather(_run_pdf(), _run_stt())
+```
+`run_in_executor`로 블로킹 I/O를 비동기 컨텍스트에서 처리. 두 작업 중 더 오래 걸리는 것의 시간이 전체 대기 시간이 됨 (순차 합산 대비 단축).
+
+---
+
+## 9단계: 스트리밍 자동 스크롤 (2026-05-15)
+
+### 구현
+
+`app.js`에 scroll 이벤트 기반 자동 스크롤 추가:
+- 첫 청크 도착 시 `streamAutoScroll = true`로 설정
+- 각 청크마다 `content.scrollTop = content.scrollHeight` 실행
+- `scroll` 이벤트 리스너: 현재 스크롤 위치가 하단에서 60px 이상 멀어지면 `streamAutoScroll = false` → 수동 스크롤로 전환
+
+---
+
+## 10단계: 사용자 인증 시스템 (2026-05-15)
+
+### 목표
+최초 화면에서 로그인, 자동 로그인 체크박스, 사용자별 데이터 격리. 알파/베타 수준이므로 SHA256+salt 방식으로 구현.
+
+### DB 스키마 추가 (`models.py`)
+
+```python
+class User(Base):
+    id, username, password_hash, salt
+    email, display_name, school, major, plan, locale  # 추가 필드
+    created_at
+
+class Session(Base):
+    id, user_id (FK), token, created_at, expires_at
+
+class Lecture(Base):
+    user_id (FK, nullable)  # 기존 데이터 호환
+```
+
+### 인증 모듈 (`src/auth.py`)
+
+- `hash_password(password, salt)` — SHA256 단방향 해시
+- `verify_password(password, salt, stored_hash)` — 검증
+- `create_session(user_id, db)` — 72h TTL 토큰 생성
+- `get_current_user(authorization, db)` — `Authorization: Bearer <token>` 헤더 검증, FastAPI Dependency로 사용
+
+### 신규 API 엔드포인트
+
+| 엔드포인트 | 설명 |
+|---|---|
+| POST /api/auth/register | 회원가입 (프로필 정보 포함) |
+| POST /api/auth/login | 로그인 → `{"token": ..., "user": {...}}` |
+| POST /api/auth/logout | 세션 토큰 삭제 |
+| GET /api/auth/me | 현재 사용자 전체 정보 |
+| PATCH /api/auth/me | 프로필 수정 |
+| PATCH /api/auth/password | 비밀번호 변경 (전체 세션 무효화) |
+| DELETE /api/auth/me | 계정 및 모든 데이터 삭제 |
+| GET /api/auth/stats | 강의·노트 개수 통계 |
+
+### 인라인 마이그레이션
+
+서버 시작 시 기존 DB에 누락 컬럼 자동 추가 (SQLite `ALTER TABLE`). 컬럼이 이미 존재하면 예외 무시:
+```python
+@app.on_event("startup")
+async def startup_migrate():
+    migrations = [
+        "ALTER TABLE lectures ADD COLUMN user_id ...",
+        "ALTER TABLE users ADD COLUMN email TEXT",
+        ...
+    ]
+```
+
+### 프론트엔드 인증 흐름 (`app.js`)
+
+- `authFetch(url, opts)` — 모든 API 호출에 `Authorization: Bearer <token>` 자동 첨부, 401 수신 시 토큰 삭제 후 온보딩 화면으로 이동
+- `loadToken()` / `saveToken(token, persist)` — `localStorage` (자동 로그인) 또는 `sessionStorage` (일반 로그인)
+- 앱 초기화 시 저장된 토큰으로 `/api/auth/me` 호출 → 유효 시 앱 직접 진입, 무효 시 온보딩 화면
+
+### 다운로드 엔드포인트 토큰 처리
+
+`GET /api/download-note/{id}`는 `window.open()`으로 URL을 열기 때문에 `Authorization` 헤더를 보낼 수 없다. `?token=<token>` 쿼리 파라미터로도 인증을 수락하도록 백엔드 수정:
+```python
+def download_note(output_id: int, token: Optional[str] = None, ...):
+    raw_token = token or (authorization.split(" ", 1)[1] if ...)
+```
+
+---
+
+## 11단계: UI 대규모 개편 — Auth + Profile + Pipeline A (2026-05-15)
+
+### 디자인 기준
+
+Claude 디자인으로 작성된 JSX 프로토타입 파일(`update/` → `docs/design/`에 보관)을 참고해 Vanilla JS로 구현. 선택 디자인:
+- **Onboarding A**: 네이비 풀스크린, 로고 + 설명 + 버튼 2개
+- **Login A**: 네이비 상단 + 화이트 카드 + 자동 로그인 체크박스
+- **Signup B**: 2단계 프로그레스 도트
+- **Profile B**: 그라디언트 헤더 + 통계 + 메뉴 행
+- **Pipeline A**: 스텝 연결선 + 서브텍스트 + 경과 카운터
+
+### 신규 아이콘 (`public/assets/icons.svg`)
+
+17개 아이콘 추가: `i-chevron`, `i-eye`, `i-eye-off`, `i-mail`, `i-lock`, `i-user`, `i-at`, `i-school`, `i-moon`, `i-bell`, `i-globe`, `i-crown`, `i-logout`, `i-user-del`, `i-info`, `i-sparkles`, `i-shield`
+
+### 신규 CSS 섹션 (`public/assets/styles.css`)
+
+- **Auth root / Onboarding A** — 풀스크린 auth 컨테이너, 온보딩 버튼
+- **Login A** — 네이비 헤더 + 화이트 카드, 아이콘 인풋, 비밀번호 토글
+- **Signup B** — 프로그레스 도트 (pending / active / done 상태)
+- **Profile B** — 그라디언트 헤더, 아바타, 통계 행, 프로필 메뉴 행
+- **Pipeline A** — `.pipeline-step-wrap::after` 연결선, 단계별 서브텍스트, 카운터
+- **Delete modal** — 하단 슬라이드 업 모달
+
+### HTML 구조 (`public/index.html`)
+
+```
+#auth-root          ← 인증 스크린 컨테이너 (position: fixed z-index 900)
+  #screen-onboarding
+  #screen-login
+  #screen-signup
+#profile-screen     ← 프로필 풀스크린 (position: fixed z-index 850)
+  #edit-profile-screen
+  #change-pw-screen
+.del-modal-mask     ← 계정 삭제 모달
+#app               ← 메인 앱 (기본 display:none, 로그인 후 표시)
+  .appbar
+  .content (tab-t0 / tab-tn / tab-th)
+  .bottom-nav
+#loading (Pipeline A 로딩 오버레이)
+```
+
+### 앱 초기화 흐름 개선
+
+1. 저장된 토큰 확인 → `/api/auth/me` 호출 (최대 2.5s 스플래시 유지)
+2. 유효: 스플래시 즉시 종료 → `#app` 표시
+3. 무효/없음: 스플래시 종료 → `#auth-root` 표시 (온보딩)
+
+---
+
 ## 최종 환경 설정
 
 ### 설치 패키지
@@ -294,32 +455,51 @@ GEMINI_API_KEY=...
 
 | 파일 | 상태 |
 |------|------|
-| `main.py` | 완료 (엔드포인트 9개, CORS, SSE 스트리밍) |
-| `database.py` | 완료 |
-| `models.py` | 완료 (week 컬럼 추가) |
-| `services/__init__.py` | 완료 |
-| `services/pdf_parser.py` | 완료 |
-| `services/aggregator.py` | 완료 |
-| `services/llm_service.py` | 완료 (스트리밍 함수 추가) |
-| `services/stt_service.py` | 완료 |
-| `project_plan/make_note.md` | 완료 (단일 호출용으로 수정) |
-| `frontend/index.html` | 완료 (모바일 앱 UI, 스트리밍, 편집/삭제) |
+| `src/main.py` | 완료 (엔드포인트 17개, 인증, CORS, SSE 스트리밍, 병렬 처리) |
+| `src/auth.py` | 완료 (hash, verify, session, get_current_user) |
+| `src/database.py` | 완료 |
+| `src/models.py` | 완료 (User, Session, Lecture, Source, Output) |
+| `src/services/__init__.py` | 완료 |
+| `src/services/pdf_parser.py` | 완료 |
+| `src/services/aggregator.py` | 완료 |
+| `src/services/llm_service.py` | 완료 (스트리밍, thinking_budget=0) |
+| `src/services/stt_service.py` | 완료 (thinking_budget=0) |
+| `public/index.html` | 완료 (Auth+Profile+Pipeline A 전면 개편) |
+| `public/assets/app.js` | 완료 (authFetch, auth/profile 핸들러, Pipeline A) |
+| `public/assets/styles.css` | 완료 (Auth/Profile/Pipeline CSS 추가) |
+| `public/assets/icons.svg` | 완료 (17개 신규 아이콘 추가) |
+| `docs/planning/make_note.md` | 완료 (단일 호출용으로 수정) |
 
 ---
 
-## API 엔드포인트 요약
+## API 엔드포인트 요약 (17개)
+
+**Auth**
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET    | `/api/lectures` | 강의 목록 반환 |
-| DELETE | `/api/lectures/{id}` | 강의 삭제 (노트·소스 cascade) |
-| POST   | `/api/create-step0` | 강의계획서 → Step 0 분석, 과목명·교수명 자동 추출 |
+| POST | `/api/auth/register` | 회원가입 |
+| POST | `/api/auth/login` | 로그인 |
+| POST | `/api/auth/logout` | 로그아웃 |
+| GET | `/api/auth/me` | 내 정보 |
+| PATCH | `/api/auth/me` | 프로필 수정 |
+| PATCH | `/api/auth/password` | 비밀번호 변경 |
+| DELETE | `/api/auth/me` | 계정 삭제 |
+| GET | `/api/auth/stats` | 통계 |
+
+**Core**
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET    | `/api/lectures` | 강의 목록 (사용자별) |
+| DELETE | `/api/lectures/{id}` | 강의 삭제 (cascade) |
+| POST   | `/api/create-step0` | 강의계획서 → Step 0 분석 |
 | POST   | `/api/generate-note` | PDF + 음성 + 필기 → SSE 스트리밍 노트 생성 |
-| GET    | `/api/lectures/{id}/notes` | 특정 강의의 노트 목록 |
-| GET    | `/api/notes/{id}` | 노트 내용 반환 |
-| PATCH  | `/api/notes/{id}` | 노트 내용 수정 |
+| GET    | `/api/lectures/{id}/notes` | 노트 목록 |
+| GET    | `/api/notes/{id}` | 노트 내용 |
+| PATCH  | `/api/notes/{id}` | 노트 수정 |
 | DELETE | `/api/notes/{id}` | 노트 삭제 |
-| GET    | `/api/download-note/{id}` | 노트 HTML 파일 다운로드 |
+| GET    | `/api/download-note/{id}` | HTML 다운로드 (`?token=` 지원) |
 
 ---
 

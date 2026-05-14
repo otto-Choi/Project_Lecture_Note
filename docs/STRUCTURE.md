@@ -41,33 +41,34 @@
 lecture_note_project/
 ├── .env                        # Gemini API Key 등 환경변수 (Git 제외 필수)
 ├── launch.bat                  # 서버 실행: uvicorn main:app --reload --app-dir src
-├── index.html                  # 프론트엔드 SPA (테스트 시 브라우저로 직접 열기)
 │
 ├── src/                        # Python 백엔드 소스
-│   ├── main.py                 # FastAPI 앱 진입점, 9개 API 엔드포인트
+│   ├── main.py                 # FastAPI 앱 진입점, 17개 API 엔드포인트
+│   ├── auth.py                 # 인증 유틸 (hash, session, get_current_user)
 │   ├── database.py             # SQLAlchemy 엔진 및 세션
-│   ├── models.py               # ORM 모델 (Lecture, Note 등)
+│   ├── models.py               # ORM 모델 (User, Session, Lecture, Source, Output)
 │   ├── make_pptx_4th.py        # 4차 발표 PPTX 생성 스크립트
 │   └── services/
 │       ├── aggregator.py       # 멀티소스 데이터 통합
-│       ├── llm_service.py      # Gemini LLM 호출 (노트 생성, 복습문제)
+│       ├── llm_service.py      # Gemini LLM 호출 (노트 생성, thinking_budget=0)
 │       ├── pdf_parser.py       # PyMuPDF 기반 슬라이드 파싱
-│       └── stt_service.py      # Gemini Audio API 음성 변환
+│       └── stt_service.py      # Gemini Audio API 음성 변환 (thinking_budget=0)
+│
+├── public/                     # 프론트엔드 에셋 (FastAPI StaticFiles로 서브)
+│   ├── index.html              # 멀티스크린 SPA (Auth / Main App / Profile)
+│   └── assets/
+│       ├── app.js              # 앱 로직 (authFetch, auth/profile 핸들러, Pipeline A)
+│       ├── styles.css          # 스타일 (Auth/Login/Signup/Profile/Pipeline CSS 포함)
+│       └── icons.svg           # SVG 아이콘 스프라이트 (37개)
 │
 ├── data/
 │   ├── lecture.db              # SQLite DB (Git 제외 권장)
 │   └── examples/               # 테스트용 샘플 입력 파일
-│       ├── 조직행동론.pdf
-│       ├── 조직행동론 w3.m4a
-│       ├── Lecture Slides_Week 3_Motivation 2.pdf
-│       └── w3.docx
 │
-├── package/                    # Android PWA 패키징 (Capacitor)
+├── package/                    # Android 패키징 (Capacitor)
 │   ├── capacitor.config.ts
 │   ├── package.json
-│   ├── www/                    # 빌드된 웹 에셋
-│   ├── android-patches/
-│   ├── android-resources/
+│   ├── www/
 │   ├── BUILD_GUIDE.md
 │   └── README.md
 │
@@ -79,28 +80,17 @@ lecture_note_project/
     ├── presentation.md         # 발표 관련 메모
     ├── 백엔드 테스트.url
     │
-    ├── presentations/          # 차수별 발표 자료 (PDF + PPTX + 대본 + 스크린샷)
-    │   ├── 1차/
-    │   │   ├── 렉쳐노트_1차 발표.pdf
-    │   │   ├── 렉쳐노트_1차발표.pptx
-    │   │   └── 1차발표_대본.txt
-    │   ├── 2차/
-    │   │   ├── 렉쳐노트_2차발표.pdf
-    │   │   ├── 렉쳐노트_2차발표.pptx
-    │   │   └── 2차발표_대본.txt
-    │   ├── 3차/
-    │   │   ├── 렉쳐노트_3차발표.pdf
-    │   │   ├── 렉쳐노트_3차발표.pptx
-    │   │   ├── 렉처노트_3차발표.md
-    │   │   └── screenshots/    # 앱 시연 스크린샷 (1.png ~ 8.png)
-    │   └── 4차/
-    │       ├── 렉쳐노트_4차발표.pdf
-    │       ├── 렉쳐노트_4차발표.pptx
-    │       ├── 4차발표_대본.txt
-    │       └── screenshots/    # 기능별 스크린샷 (01_강의계획서 등록 ~ 11_복습문제 예시)
+    ├── design/                 # Claude 디자인 프로토타입 참조 파일
+    │   ├── README_AUTH.md      # Auth UI 선택 기준
+    │   ├── prototype.html      # 전체 화면 프로토타입
+    │   ├── login-signup-designs.html
+    │   └── screens/            # JSX 스크린 파일 (로그인·회원가입·프로필 등)
+    │
+    ├── presentations/          # 차수별 발표 자료
+    │   ├── 1차/ 2차/ 3차/ 4차/
+    │   └── 각 차수: PDF + PPTX + 대본 + screenshots/
     │
     ├── planning/               # 개발 기획 문서
-    │   ├── 3차발표_대비_기획.md
     │   ├── make_note.md
     │   ├── syllabus_analysis.md
     │   ├── 백엔드_구현_가이드.md

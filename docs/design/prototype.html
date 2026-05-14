@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>LectureNote · 인증 플로우 클릭 프로토타입</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0F1B3D; color: #E5E7EB; }
+  * { box-sizing: border-box; }
+  @keyframes step-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.55); opacity: 0.45; } }
+  @keyframes cursor-blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+  @keyframes splash-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  input, button, textarea { font-family: inherit; }
+  input { outline: none; }
+
+  .layout {
+    display: flex; height: 100vh; width: 100vw;
+  }
+  .left-rail {
+    width: 280px; flex-shrink: 0; padding: 22px 18px;
+    background: linear-gradient(180deg, #0F1B3D 0%, #1A2D5E 100%);
+    color: #fff; overflow: auto;
+    border-right: 1px solid rgba(255,255,255,0.08);
+  }
+  .rail-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .rail-title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+  .rail-section { font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,0.42);
+    letter-spacing: 0.12em; text-transform: uppercase; margin: 18px 0 8px; }
+  .rail-btn { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    padding: 8px 10px; border-radius: 8px; background: transparent; color: rgba(255,255,255,0.78);
+    border: none; font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: background 0.15s, color 0.15s; }
+  .rail-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .rail-btn.active { background: rgba(75,130,197,0.22); color: #fff; font-weight: 700; }
+  .rail-btn .badge { margin-left: auto; font-size: 9.5px; font-weight: 700;
+    padding: 1.5px 6px; border-radius: 20px; background: rgba(75,130,197,0.32); }
+
+  .stage {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 22px; position: relative;
+    background: radial-gradient(ellipse at top, #16284f 0%, #0F1B3D 60%);
+  }
+  .phone-frame {
+    width: 430px; height: 900px;
+    border-radius: 38px; padding: 12px;
+    background: linear-gradient(140deg, #1c1c1e 0%, #2a2a2e 100%);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) inset;
+    position: relative; flex-shrink: 0;
+  }
+  .phone-frame::before {
+    content: ''; position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 30px; border-radius: 20px; background: #000;
+    z-index: 2; pointer-events: none;
+  }
+  .phone-screen {
+    width: 100%; height: 100%; border-radius: 28px; overflow: hidden;
+    position: relative; background: #fff;
+  }
+  .scene { position: absolute; inset: 0; animation: fade-in 0.32s ease; }
+
+  .stage-foot {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.45); font-size: 11.5px; letter-spacing: 0.04em;
+    background: rgba(255,255,255,0.04); padding: 7px 14px; border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .stage-foot b { color: rgba(255,255,255,0.85); }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="screens/shared.jsx"></script>
+<script type="text/babel" src="screens/login.jsx"></script>
+<script type="text/babel" src="screens/signup.jsx"></script>
+<script type="text/babel" src="screens/find.jsx"></script>
+<script type="text/babel" src="screens/profile.jsx"></script>
+<script type="text/babel" src="screens/onboarding.jsx"></script>
+<script type="text/babel" src="screens/pipeline.jsx"></script>
+<script type="text/babel" src="screens/main-app.jsx"></script>
+<script type="text/babel" src="screens/account.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function Splash({ onDone }) {
+  const { LectureLogo } = window.LN;
+  React.useEffect(() => {
+    const t = setTimeout(() => onDone && onDone(), 1400);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, background: '#1A2D5E',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: 22,
+    }}>
+      <div style={{ animation: 'splash-pulse 1.6s ease-in-out infinite' }}>
+        <LectureLogo size={88}/>
+      </div>
+      <div style={{ color: '#fff', fontSize: 24, fontWeight: 800, letterSpacing: '-0.4px' }}>
+        Lecture<span style={{ color: '#4B82C5' }}>Note</span>
+      </div>
+      <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>멀티모달 강의 노트 파이프라인</div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        {[0,1,2].map(i => (
+          <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#4B82C5',
+            animation: 'splash-pulse 1.1s infinite', animationDelay: `${i * 0.18}s` }}/>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [route, setRoute] = React.useState('splash');
+  const [authed, setAuthed] = React.useState(false);
+
+  // 자동 로그인 (localStorage) 시뮬레이션
+  const [autoLogin, setAutoLogin] = React.useState(() => {
+    try { return localStorage.getItem('ln_autologin') === '1'; } catch { return false; }
+  });
+
+  const nav = (to) => setRoute(to);
+  const afterSplash = () => {
+    // 자동 로그인이 활성화면 바로 메인으로
+    if (autoLogin) { setAuthed(true); setRoute('main'); }
+    else setRoute('onboarding');
+  };
+  const onLogin = (remember) => {
+    setAuthed(true);
+    try { localStorage.setItem('ln_autologin', remember ? '1' : '0'); } catch {}
+    setAutoLogin(!!remember);
+    setRoute('main');
+  };
+  const onLogout = () => {
+    setAuthed(false);
+    try { localStorage.setItem('ln_autologin', '0'); } catch {}
+    setAutoLogin(false);
+    setRoute('login');
+  };
+
+  const { LoginA } = window.LoginScreens;
+  const { SignupB, SignupBStep2 } = window.SignupScreens;
+  const { FindId, FindPw, FindIdResult } = window.FindScreens;
+  const { ProfilePageB } = window.ProfileScreens;
+  const { OnboardingWelcome } = window.OnboardingScreens;
+  const { PipelineA } = window.PipelineScreens;
+  const { PasswordChange, AccountInfo, Subscription, LanguageSettings } = window.AccountScreens;
+  const { MainApp } = window;
+
+  // LoginA needs a wrapped onLogin that captures the "자동 로그인" choice — we pass it as a closure
+  let scene = null;
+  if (route === 'splash')           scene = <Splash onDone={afterSplash}/>;
+  else if (route === 'onboarding')  scene = <OnboardingWelcome nav={nav}/>;
+  else if (route === 'login')       scene = <LoginAWithRemember nav={nav} onLogin={onLogin} defaultRemember={autoLogin}/>;
+  else if (route === 'signup')      scene = <SignupB nav={nav}/>;
+  else if (route === 'signup-step2')scene = <SignupBStep2 nav={nav} onComplete={() => onLogin(true)}/>;
+  else if (route === 'find')        scene = <FindId nav={nav}/>;
+  else if (route === 'find-pw')     scene = <FindPw nav={nav}/>;
+  else if (route === 'find-result') scene = <FindIdResult nav={nav}/>;
+  else if (route === 'main')        scene = <MainApp user="김" nav={nav}/>;
+  else if (route === 'profile')     scene = <ProfilePageB nav={nav} onLogout={onLogout}/>;
+  else if (route === 'password-change') scene = <PasswordChange nav={nav}/>;
+  else if (route === 'account-info')    scene = <AccountInfo nav={nav} onDelete={onLogout}/>;
+  else if (route === 'subscription')    scene = <Subscription nav={nav}/>;
+  else if (route === 'language')        scene = <LanguageSettings nav={nav}/>;
+  else if (route === 'pipeline')    scene = <PipelineA nav={nav}/>;
+
+  return (
+    <div className="layout">
+      <aside className="left-rail">
+        <div className="rail-logo">
+          <window.LN.LectureLogo size={32}/>
+          <div className="rail-title">Lecture<span style={{ color: '#4B82C5' }}>Note</span></div>
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.55 }}>
+          인증 플로우 클릭 프로토타입.<br/>
+          폰 안의 버튼이 진짜로 동작합니다.
+        </div>
+
+        <div className="rail-section">미인증 플로우</div>
+        <RailBtn id="splash"      route={route} onClick={() => setRoute('splash')}>스플래시</RailBtn>
+        <RailBtn id="onboarding"  route={route} onClick={() => setRoute('onboarding')}>온보딩 (웰컴)</RailBtn>
+        <RailBtn id="login"       route={route} onClick={() => setRoute('login')}>로그인 <span className="badge">A</span></RailBtn>
+        <RailBtn id="signup"      route={route} onClick={() => setRoute('signup')}>회원가입 ① 계정 <span className="badge">B</span></RailBtn>
+        <RailBtn id="signup-step2"route={route} onClick={() => setRoute('signup-step2')}>회원가입 ② 프로필</RailBtn>
+        <RailBtn id="find"        route={route} onClick={() => setRoute('find')}>아이디 찾기</RailBtn>
+        <RailBtn id="find-pw"     route={route} onClick={() => setRoute('find-pw')}>비밀번호 찾기</RailBtn>
+        <RailBtn id="find-result" route={route} onClick={() => setRoute('find-result')}>아이디 찾기 결과</RailBtn>
+
+        <div className="rail-section">인증 후 플로우</div>
+        <RailBtn id="main"     route={route} onClick={() => setRoute('main')}>메인 앱 (강의 등록)</RailBtn>
+        <RailBtn id="profile"  route={route} onClick={() => setRoute('profile')}>내 정보 <span className="badge">B</span></RailBtn>
+        <RailBtn id="pipeline" route={route} onClick={() => setRoute('pipeline')}>파이프라인 진행 <span className="badge">A</span></RailBtn>
+
+        <div className="rail-section">계정 관리 (프로필 하위)</div>
+        <RailBtn id="password-change" route={route} onClick={() => setRoute('password-change')}>비밀번호 변경</RailBtn>
+        <RailBtn id="account-info"    route={route} onClick={() => setRoute('account-info')}>가입 정보 (+ 탈퇴)</RailBtn>
+        <RailBtn id="subscription"    route={route} onClick={() => setRoute('subscription')}>구독 플랜</RailBtn>
+        <RailBtn id="language"        route={route} onClick={() => setRoute('language')}>언어 설정</RailBtn>
+
+        <div className="rail-section">상태</div>
+        <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.7, padding: '4px 10px' }}>
+          인증: <b style={{ color: authed ? '#22C55E' : '#F59E0B' }}>{authed ? '로그인됨' : '미인증'}</b><br/>
+          자동 로그인: <b style={{ color: autoLogin ? '#22C55E' : '#6E6E73' }}>{autoLogin ? 'ON' : 'OFF'}</b><br/>
+          <span style={{ color: 'rgba(255,255,255,0.45)' }}>(localStorage에 저장됨)</span>
+        </div>
+        <button onClick={() => { try { localStorage.removeItem('ln_autologin'); } catch {} setAutoLogin(false); setAuthed(false); setRoute('splash'); }}
+          style={{ marginTop: 12, width: '100%', padding: '8px 10px', borderRadius: 8,
+            background: 'rgba(231,76,60,0.18)', color: '#FCA5A5', border: '1px solid rgba(231,76,60,0.32)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          상태 초기화 (다시 시작)
+        </button>
+      </aside>
+
+      <div className="stage">
+        <div className="phone-frame">
+          <div className="phone-screen">{scene}</div>
+        </div>
+        <div className="stage-foot">
+          현재 화면: <b>{route}</b> · 좌측 메뉴로 점프하거나 화면 안 버튼/링크로 이동하세요
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RailBtn({ id, route, onClick, children }) {
+  return (
+    <button className={`rail-btn ${route === id ? 'active' : ''}`} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+// LoginA를 감싸 "자동 로그인" 상태를 onLogin으로 전달
+function LoginAWithRemember({ nav, onLogin, defaultRemember }) {
+  const { LoginA } = window.LoginScreens;
+  return <LoginA nav={nav} onLogin={onLogin} defaultRemember={defaultRemember}/>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

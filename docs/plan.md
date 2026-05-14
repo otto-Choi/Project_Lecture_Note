@@ -9,11 +9,12 @@
 
 | 레이어 | 기술 | 비고 |
 |---|---|---|
-| 백엔드 | FastAPI + Python | 9개 API 엔드포인트, SSE 스트리밍 |
+| 백엔드 | FastAPI + Python | 17개 API 엔드포인트, SSE 스트리밍 |
 | DB | SQLite | `data/lecture.db` |
 | AI | Gemini 2.5-flash | LLM 생성 + STT + 컨텍스트 분석 단일 API |
-| 프론트 | Vanilla HTML/CSS/JS | 빌드 도구 불필요, 단일 파일 SPA |
-| 배포 | Railway (예정) | |
+| 인증 | 세션 토큰 (Bearer) | SHA256+salt 해시, 72h TTL, localStorage 자동 로그인 |
+| 프론트 | Vanilla HTML/CSS/JS | 멀티스크린 SPA (Auth / Main App / Profile) |
+| 배포 | Railway | `https://web-production-94071.up.railway.app` |
 
 이 구조는 현재 검증 단계에 맞게 의도적으로 경량화된 선택이다. Docker/K8s, PostgreSQL, React 빌드 파이프라인은 현재 운영 규모에서 불필요한 복잡도를 추가할 뿐이다. 트래픽 검증 이후 단계적 전환이 올바른 순서다.
 
@@ -136,14 +137,17 @@ web: uvicorn main:app --host 0.0.0.0 --port $PORT --app-dir src
 
 팀 프로젝트 마지막 주차까지 목표한 앱 개발을 완료하는 것이 우선이다. 아래는 우선순위 순서.
 
-| 항목 | 내용 | 예상 공수 |
+| 항목 | 내용 | 상태 |
 |---|---|---|
-| PWA 매니페스트 | `manifest.json` + 아이콘 추가 → 모바일 홈 화면 설치 | 1시간 |
-| 파이프라인 스텝 인디케이터 | 처리 단계 시각화 (Ingestion → STT → Aggregation → Generation) | 2~3시간 |
-| 처리 메타데이터 표시 | 노트 완료 후 소스 구성·처리 시간 표시 | 1시간 |
-| 이미지 입력 지원 | Gemini Vision 기반 칠판 사진·필기 이미지 처리 | 3~4시간 |
-| 노트 키워드 검색 | SQLite FTS 또는 프론트 필터링 | 2시간 |
-| Whisper 전환 검토 | Gemini API 비용 대비 오픈소스 STT 전환 가능성 | 검토 필요 |
+| ✅ STT 성능 최적화 | `thinking_budget=0` + `asyncio.gather` 병렬 PDF·STT | 완료 |
+| ✅ 스트리밍 자동 스크롤 | 생성 중 하단 자동 스크롤, 수동 스크롤 시 멈춤 | 완료 |
+| ✅ 사용자 인증 시스템 | 로그인·회원가입·세션 토큰·사용자별 데이터 격리 | 완료 |
+| ✅ 파이프라인 스텝 인디케이터 | Pipeline A — 연결선·서브텍스트·경과시간 카운터 | 완료 |
+| ✅ 프로필 화면 | Profile B — 통계·편집·비밀번호 변경·계정 삭제 | 완료 |
+| PWA 매니페스트 | `manifest.json` + 아이콘 추가 → 모바일 홈 화면 설치 | 대기 (1시간) |
+| 처리 메타데이터 표시 | 노트 완료 후 소스 구성·처리 시간 표시 | 대기 (1시간) |
+| 이미지 입력 지원 | Gemini Vision 기반 칠판 사진·필기 이미지 처리 | 대기 (3~4시간) |
+| 노트 키워드 검색 | SQLite FTS 또는 프론트 필터링 | 대기 (2시간) |
 
 ---
 

@@ -6,14 +6,10 @@
   <meta name="theme-color" content="#1A2D5E">
   <title>LectureNote</title>
 
-  <!-- Pretendard font (offline-friendly: cached after first launch) -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-
-  <!-- App stylesheet -->
   <link rel="stylesheet" href="assets/styles.css">
 
-  <!-- Inline-load the SVG icon sprite so <use href="#..."> works in WebView -->
   <script>
     fetch('assets/icons.svg').then(r => r.text()).then(t => {
       const wrap = document.createElement('div');
@@ -23,14 +19,14 @@
     }).catch(() => {});
   </script>
 
-  <!-- Markdown + PDF (loaded from CDN; for offline-only builds, vendor these locally) -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-
 </head>
 <body>
 
-<!-- Boot splash (in-app, shown briefly while Capacitor native splash dismisses) -->
+<!-- ═══════════════════════════════════════════════════════════
+     Boot splash
+════════════════════════════════════════════════════════════ -->
 <div class="boot-splash" id="boot-splash">
   <div class="boot-logo">
     <svg viewBox="0 0 48 48">
@@ -50,7 +46,360 @@
   <div class="boot-dots"><span></span><span></span><span></span></div>
 </div>
 
-<div id="app">
+
+<!-- ═══════════════════════════════════════════════════════════
+     Auth root (Onboarding / Login / Signup / Find screens)
+════════════════════════════════════════════════════════════ -->
+<div class="auth-root" id="auth-root">
+
+  <!-- ── Onboarding A ──────────────────────────────────── -->
+  <div class="onboarding-screen" id="screen-onboarding">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+      <div class="onboarding-logo">
+        <svg viewBox="0 0 48 48">
+          <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+          <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+          <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+          <rect x="14.5" y="17.5" width="6.5" height="1.2" fill="#fff" opacity="0.65"/>
+          <rect x="14.5" y="20.5" width="5.5" height="1.2" fill="#fff" opacity="0.65"/>
+          <rect x="14.5" y="23.5" width="6" height="1.2" fill="#fff" opacity="0.65"/>
+          <rect x="27.5" y="17.5" width="6.5" height="1.2" fill="#1A2D5E"/>
+          <rect x="27.5" y="20.5" width="5.5" height="1.2" fill="#6E6E73"/>
+          <rect x="27.5" y="23.5" width="6" height="1.2" fill="#6E6E73"/>
+        </svg>
+      </div>
+      <div class="onboarding-title">Lecture<em>Note</em></div>
+      <div class="onboarding-desc">녹음·PDF·필기를 AI가 자동으로 정리해<br>주간 강의 노트를 완성해 드립니다.</div>
+    </div>
+    <div class="onboarding-btns">
+      <button class="btn-onboard-primary" onclick="showAuthScreen('login')">로그인</button>
+      <button class="btn-onboard-ghost" onclick="showAuthScreen('signup')">처음이세요? 회원가입</button>
+    </div>
+  </div>
+
+  <!-- ── Login A ───────────────────────────────────────── -->
+  <div class="login-screen" id="screen-login" style="display:none">
+    <div class="login-header">
+      <button class="login-back" onclick="showAuthScreen('onboarding')" aria-label="뒤로">
+        <svg><use href="#i-back"/></svg>
+      </button>
+      <div class="login-header-text">
+        <div class="login-header-title">로그인</div>
+        <div class="login-header-sub">계속하려면 로그인해 주세요</div>
+      </div>
+    </div>
+    <div class="login-card">
+      <div class="auth-err-banner" id="login-err"></div>
+
+      <div class="auth-field">
+        <label for="login-username">아이디</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-user"/></svg>
+          <input type="text" id="login-username" placeholder="아이디를 입력하세요" autocomplete="username">
+        </div>
+      </div>
+
+      <div class="auth-field">
+        <label for="login-password">비밀번호</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-lock"/></svg>
+          <input type="password" id="login-password" placeholder="비밀번호를 입력하세요" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+          <button class="btn-eye" type="button" onclick="togglePw('login-password',this)" aria-label="비밀번호 표시">
+            <svg><use href="#i-eye"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="auth-checkbox-row">
+        <input type="checkbox" class="auth-checkbox" id="login-autologin" checked>
+        <label class="auth-checkbox-label" for="login-autologin">자동 로그인</label>
+      </div>
+
+      <button class="btn btn-primary" id="btn-login" onclick="doLogin()">로그인</button>
+
+      <div class="auth-divider">또는</div>
+
+      <div class="auth-switch">
+        계정이 없으신가요? <a onclick="showAuthScreen('signup')">회원가입</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Signup B (2-step) ─────────────────────────────── -->
+  <div class="login-screen" id="screen-signup" style="display:none">
+    <div class="login-header">
+      <button class="login-back" id="signup-back-btn" onclick="signupBack()" aria-label="뒤로">
+        <svg><use href="#i-back"/></svg>
+      </button>
+      <div class="login-header-text">
+        <div class="login-header-title" id="signup-header-title">회원가입</div>
+        <div class="login-header-sub" id="signup-header-sub">계정 정보를 입력해 주세요</div>
+      </div>
+    </div>
+    <div class="login-card">
+      <!-- Progress dots -->
+      <div class="signup-progress" id="signup-progress">
+        <div class="signup-step-dot active" id="sp-dot-1"></div>
+        <div class="signup-step-line" id="sp-line-1"></div>
+        <div class="signup-step-dot" id="sp-dot-2"></div>
+      </div>
+
+      <div class="auth-err-banner" id="signup-err"></div>
+
+      <!-- Step 1: 계정 정보 -->
+      <div id="signup-step1">
+        <div class="auth-field">
+          <label for="reg-username">아이디 *</label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-user"/></svg>
+            <input type="text" id="reg-username" placeholder="3자 이상, 영문/숫자" autocomplete="username">
+          </div>
+          <div class="auth-field-hint" id="reg-username-hint"></div>
+        </div>
+        <div class="auth-field">
+          <label for="reg-password">비밀번호 *</label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-lock"/></svg>
+            <input type="password" id="reg-password" placeholder="4자 이상" autocomplete="new-password">
+            <button class="btn-eye" type="button" onclick="togglePw('reg-password',this)">
+              <svg><use href="#i-eye"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="auth-field">
+          <label for="reg-password2">비밀번호 확인 *</label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-lock"/></svg>
+            <input type="password" id="reg-password2" placeholder="비밀번호 재입력" autocomplete="new-password">
+          </div>
+          <div class="auth-field-hint" id="reg-pw-hint"></div>
+        </div>
+        <button class="btn btn-primary" id="btn-signup-next" onclick="signupStep1Next()">다음</button>
+      </div>
+
+      <!-- Step 2: 프로필 정보 (선택) -->
+      <div id="signup-step2" style="display:none">
+        <div class="auth-field">
+          <label for="reg-display-name">닉네임 <span style="font-weight:400;color:var(--muted)">(선택)</span></label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-user"/></svg>
+            <input type="text" id="reg-display-name" placeholder="표시 이름" autocomplete="nickname">
+          </div>
+        </div>
+        <div class="auth-field">
+          <label for="reg-school">학교 <span style="font-weight:400;color:var(--muted)">(선택)</span></label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-school"/></svg>
+            <input type="text" id="reg-school" placeholder="예) 서울대학교" autocomplete="organization">
+          </div>
+        </div>
+        <div class="auth-field">
+          <label for="reg-major">학과 <span style="font-weight:400;color:var(--muted)">(선택)</span></label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-at"/></svg>
+            <input type="text" id="reg-major" placeholder="예) 경영학과">
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-signup-submit" onclick="doRegister()">가입 완료</button>
+      </div>
+
+      <div class="auth-switch" style="margin-top:14px">
+        이미 계정이 있으신가요? <a onclick="showAuthScreen('login')">로그인</a>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#auth-root -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     Profile screen (Profile B)
+════════════════════════════════════════════════════════════ -->
+<div class="profile-screen" id="profile-screen">
+
+  <!-- Header with gradient -->
+  <div class="profile-header">
+    <button class="profile-back" onclick="closeProfile()" aria-label="닫기">
+      <svg><use href="#i-back"/></svg>
+    </button>
+    <div class="profile-avatar-wrap">
+      <div class="profile-avatar" id="profile-avatar-initial">?</div>
+      <div class="profile-display-name" id="profile-display-name">—</div>
+      <div class="profile-username" id="profile-username">@—</div>
+      <div class="profile-plan-badge" id="profile-plan-badge">
+        <svg><use href="#i-sparkles"/></svg>
+        <span id="profile-plan-text">Free</span>
+      </div>
+    </div>
+    <div class="profile-stats-row">
+      <div class="profile-stat">
+        <div class="profile-stat-num" id="profile-stat-lectures">—</div>
+        <div class="profile-stat-label">강의</div>
+      </div>
+      <div class="profile-stat">
+        <div class="profile-stat-num" id="profile-stat-notes">—</div>
+        <div class="profile-stat-label">노트</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="profile-body">
+
+    <!-- 계정 정보 섹션 -->
+    <div class="profile-section">
+      <div class="profile-section-title">계정 정보</div>
+      <div class="profile-row" onclick="openEditProfile()">
+        <div class="profile-row-icon"><svg><use href="#i-user"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">프로필 편집</div>
+          <div class="profile-row-value" id="profile-row-name">닉네임, 학교, 학과</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+      <div class="profile-row" onclick="openChangePassword()">
+        <div class="profile-row-icon"><svg><use href="#i-lock"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">비밀번호 변경</div>
+          <div class="profile-row-value">보안을 위해 주기적으로 변경하세요</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+    </div>
+
+    <!-- 설정 섹션 -->
+    <div class="profile-section">
+      <div class="profile-section-title">설정</div>
+      <div class="profile-row" onclick="toggleDark()">
+        <div class="profile-row-icon warn"><svg><use href="#i-moon"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">다크모드</div>
+          <div class="profile-row-value" id="profile-dark-value">현재: 라이트</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+    </div>
+
+    <!-- 기타 섹션 -->
+    <div class="profile-section">
+      <div class="profile-section-title">기타</div>
+      <div class="profile-row" onclick="doLogout()">
+        <div class="profile-row-icon"><svg><use href="#i-logout"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">로그아웃</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+      <div class="profile-row danger" onclick="openDeleteAccount()">
+        <div class="profile-row-icon danger"><svg><use href="#i-user-del"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">계정 삭제</div>
+          <div class="profile-row-value">모든 데이터가 영구 삭제됩니다</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /#profile-screen -->
+
+<!-- Edit Profile sub-screen -->
+<div class="profile-screen" id="edit-profile-screen">
+  <div class="profile-header" style="padding-bottom:20px">
+    <button class="profile-back" onclick="closeEditProfile()"><svg><use href="#i-back"/></svg></button>
+    <div class="profile-avatar-wrap" style="gap:6px;padding-top:8px">
+      <div style="font-size:1.05rem;font-weight:800;color:#fff">프로필 편집</div>
+    </div>
+  </div>
+  <div class="profile-body">
+    <div class="profile-section" style="padding:16px">
+      <div class="auth-err-banner" id="edit-profile-err"></div>
+      <div class="auth-field">
+        <label for="ep-display-name">닉네임</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-user"/></svg>
+          <input type="text" id="ep-display-name" placeholder="표시 이름">
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="ep-school">학교</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-school"/></svg>
+          <input type="text" id="ep-school" placeholder="학교명">
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="ep-major">학과</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-at"/></svg>
+          <input type="text" id="ep-major" placeholder="학과명">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveProfile()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password sub-screen -->
+<div class="profile-screen" id="change-pw-screen">
+  <div class="profile-header" style="padding-bottom:20px">
+    <button class="profile-back" onclick="closeChangePw()"><svg><use href="#i-back"/></svg></button>
+    <div class="profile-avatar-wrap" style="gap:6px;padding-top:8px">
+      <div style="font-size:1.05rem;font-weight:800;color:#fff">비밀번호 변경</div>
+    </div>
+  </div>
+  <div class="profile-body">
+    <div class="profile-section" style="padding:16px">
+      <div class="auth-err-banner" id="change-pw-err"></div>
+      <div class="auth-field">
+        <label for="cp-current">현재 비밀번호</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-lock"/></svg>
+          <input type="password" id="cp-current" placeholder="현재 비밀번호">
+          <button class="btn-eye" type="button" onclick="togglePw('cp-current',this)"><svg><use href="#i-eye"/></svg></button>
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="cp-new">새 비밀번호</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-lock"/></svg>
+          <input type="password" id="cp-new" placeholder="새 비밀번호 (4자 이상)">
+          <button class="btn-eye" type="button" onclick="togglePw('cp-new',this)"><svg><use href="#i-eye"/></svg></button>
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="cp-new2">새 비밀번호 확인</label>
+        <div class="auth-input-wrap">
+          <svg class="field-icon"><use href="#i-lock"/></svg>
+          <input type="password" id="cp-new2" placeholder="새 비밀번호 재입력">
+        </div>
+        <div class="auth-field-hint" id="cp-hint"></div>
+      </div>
+      <button class="btn btn-primary" onclick="doChangePassword()">변경</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete account modal -->
+<div class="del-modal-mask" id="del-modal-mask">
+  <div class="del-modal">
+    <div class="del-modal-title">계정을 삭제하시겠어요?</div>
+    <div class="del-modal-desc">
+      강의, 노트 등 모든 데이터가 영구 삭제됩니다.<br>
+      이 작업은 되돌릴 수 없습니다.
+    </div>
+    <div class="del-modal-actions">
+      <button class="btn-ghost" onclick="closeDeleteAccount()">취소</button>
+      <button class="btn-danger" onclick="doDeleteAccount()">계정 삭제</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     Main app
+════════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none">
 
   <!-- ─── App bar ────────────────────────────── -->
   <header class="appbar">
@@ -67,8 +416,11 @@
     </div>
     <div class="appbar-title">Lecture<em>Note</em></div>
     <div class="appbar-page" id="appbar-page">강의 등록</div>
+    <button class="appbar-action" id="btn-profile" onclick="openProfile()" aria-label="프로필" style="display:none">
+      <svg><use href="#i-user"/></svg>
+    </button>
     <button class="appbar-action" id="btn-darkmode" onclick="toggleDark()" aria-label="다크모드">
-      <svg id="icon-dark"  style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg id="icon-dark" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       <svg id="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
     </button>
   </header>
@@ -286,7 +638,10 @@
 
 </div><!-- /#app -->
 
-<!-- ─── Loading overlay (pipeline) ─────────────── -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     Loading overlay (Pipeline A)
+════════════════════════════════════════════════════════════ -->
 <div class="loading-mask" id="loading">
   <div class="loading-box">
     <div class="load-header">
@@ -302,14 +657,17 @@
         <div class="load-sub" id="load-sub"></div>
       </div>
     </div>
-    <div class="load-steps" id="load-steps"></div>
-    <div class="load-timer" id="load-timer">경과 0초</div>
+    <!-- Pipeline A steps injected by JS -->
+    <div class="pipeline-steps" id="load-steps"></div>
+    <div class="pipeline-counter" id="load-timer">
+      <svg style="width:13px;height:13px"><use href="#i-bolt"/></svg>
+      경과 <span class="pipeline-counter-num" id="load-timer-num">0</span>초
+    </div>
   </div>
 </div>
 
-<!-- ─── Toast ──────────────────────────────────── -->
+<!-- Toast -->
 <div id="toast"></div>
-
 
 <script src="assets/app.js"></script>
 </body>

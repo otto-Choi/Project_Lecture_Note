@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>LectureNote · 로그인/회원가입 디자인 시안</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  * { box-sizing: border-box; }
+  @keyframes step-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.55); opacity: 0.45; } }
+  @keyframes cursor-blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+  input, button, textarea { font-family: inherit; }
+  input { outline: none; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="screens/shared.jsx"></script>
+<script type="text/babel" src="screens/login.jsx"></script>
+<script type="text/babel" src="screens/signup.jsx"></script>
+<script type="text/babel" src="screens/find.jsx"></script>
+<script type="text/babel" src="screens/profile.jsx"></script>
+<script type="text/babel" src="screens/onboarding.jsx"></script>
+<script type="text/babel" src="screens/pipeline.jsx"></script>
+<script type="text/babel" src="screens/account.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function App() {
+  const { LoginA, LoginB, LoginC } = window.LoginScreens;
+  const { SignupA, SignupB, SignupBStep2 } = window.SignupScreens;
+  const { FindId, FindPw, FindIdResult } = window.FindScreens;
+  const { ProfileSheetA, ProfilePageB } = window.ProfileScreens;
+  const { OnboardingWelcome, GuestSavePrompt } = window.OnboardingScreens;
+  const { PipelineA, PipelineB, PipelineC } = window.PipelineScreens;
+  const { PasswordChange, AccountInfo, Subscription, LanguageSettings } = window.AccountScreens;
+
+  return (
+    <DesignCanvas
+      title="LectureNote · 로그인 / 회원가입 / 프로필 디자인 시안"
+      subtitle="430×900 모바일 (Capacitor 빌드 기준) · 화면을 더블클릭하면 풀스크린, 드래그로 순서 변경"
+    >
+      <DCSection id="onboarding" title="① 온보딩 · 미인증 진입">
+        <DCArtboard id="ob-welcome" label="A · 풀스크린 웰컴 (스플래시 다음)" width={430} height={900}>
+          <OnboardingWelcome/>
+        </DCArtboard>
+        <DCArtboard id="ob-guest" label="B · 게스트 모드 + 저장 시점 인증 요구" width={430} height={900}>
+          <GuestSavePrompt/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="login" title="② 로그인 화면 — 3 변주">
+        <DCArtboard id="login-a" label="A · 네이비 헤더 + 화이트 카드 폼 (요청한 톤)" width={430} height={900}>
+          <LoginA/>
+        </DCArtboard>
+        <DCArtboard id="login-b" label="B · 미니멀 (담백 · 흰 배경)" width={430} height={900}>
+          <LoginB/>
+        </DCArtboard>
+        <DCArtboard id="login-c" label="C · 풀 네이비 + 플로팅 카드 (앱스러움)" width={430} height={900}>
+          <LoginC/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="signup" title="③ 회원가입 — 2 변주">
+        <DCArtboard id="signup-a" label="A · 단일 폼 (한 번에 모두 입력)" width={430} height={900}>
+          <SignupA/>
+        </DCArtboard>
+        <DCArtboard id="signup-b" label="B · 2-스텝 / Step 1 계정" width={430} height={900}>
+          <SignupB/>
+        </DCArtboard>
+        <DCArtboard id="signup-b2" label="B · 2-스텝 / Step 2 프로필+약관" width={430} height={900}>
+          <SignupBStep2/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="find" title="④ 아이디 / 비밀번호 찾기">
+        <DCArtboard id="find-id" label="아이디 찾기" width={430} height={900}>
+          <FindId/>
+        </DCArtboard>
+        <DCArtboard id="find-pw" label="비밀번호 찾기" width={430} height={900}>
+          <FindPw/>
+        </DCArtboard>
+        <DCArtboard id="find-result" label="결과 화면 (성공)" width={430} height={900}>
+          <FindIdResult/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="profile" title="⑤ 프로필 / 계정 메뉴">
+        <DCArtboard id="profile-a" label="A · 바텀 시트 (앱바 우측 아이콘에서 열림)" width={430} height={900}>
+          <ProfileSheetA/>
+        </DCArtboard>
+        <DCArtboard id="profile-b" label="B · 풀페이지 '내 정보' (그라데이션 헤더)" width={430} height={900}>
+          <ProfilePageB/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="pipeline" title="⑥ Gemini 파이프라인 진행 표시 (덤·요청.md 개선)">
+        <DCArtboard id="pipe-a" label="A · 개선된 스텝리스트 (서브 상태 + 경과)" width={430} height={900}>
+          <PipelineA/>
+        </DCArtboard>
+        <DCArtboard id="pipe-b" label="B · 진행률 + 실시간 스트리밍 미리보기" width={430} height={900}>
+          <PipelineB/>
+        </DCArtboard>
+        <DCArtboard id="pipe-c" label="C · 화면 안 가리는 상단 칩 (덜 모달)" width={430} height={900}>
+          <PipelineC/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="account" title="⑦ 계정 관리 화면 (프로필 B의 하위 페이지)">
+        <DCArtboard id="acct-pw" label="비밀번호 변경" width={430} height={900}>
+          <PasswordChange/>
+        </DCArtboard>
+        <DCArtboard id="acct-info" label="가입 정보 (+ 회원탈퇴)" width={430} height={900}>
+          <AccountInfo/>
+        </DCArtboard>
+        <DCArtboard id="acct-sub" label="구독 플랜" width={430} height={900}>
+          <Subscription/>
+        </DCArtboard>
+        <DCArtboard id="acct-lang" label="언어 설정 (API 서버 자리)" width={430} height={900}>
+          <LanguageSettings/>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

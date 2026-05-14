@@ -19,5 +19,8 @@ def process_audio_to_text(audio_bytes: bytes, mime_type: str = "audio/mp4") -> s
             types.Part.from_bytes(data=audio_bytes, mime_type=base_mime),
             "이 음성을 한국어로 그대로 받아쓰기 해줘. 말한 내용만 출력하고 다른 설명은 하지 마.",
         ],
+        config=types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        ),
     )
     return response.text

@@ -1,18 +1,22 @@
-from fastapi import FastAPI, Form, UploadFile, File, Depends, HTTPException
+from datetime import datetime, timezone
+from fastapi import FastAPI, Form, UploadFile, File, Depends, HTTPException, Header
 from fastapi.responses import Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import Optional
+import asyncio
 import json
 import markdown
+import secrets
 
 import models
+import auth
 from database import engine, get_db, SessionLocal
 from services import pdf_parser, stt_service, aggregator, llm_service
 
-# 앱 시작 시 lecture.db에 테이블 자동 생성
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="LectureNote API")
@@ -25,10 +29,195 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup_migrate():
+    """인라인 마이그레이션 — 누락 컬럼을 안전하게 추가."""
+    migrations = [
+        "ALTER TABLE lectures ADD COLUMN user_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE users ADD COLUMN email TEXT",
+        "ALTER TABLE users ADD COLUMN display_name TEXT",
+        "ALTER TABLE users ADD COLUMN school TEXT",
+        "ALTER TABLE users ADD COLUMN major TEXT",
+        "ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'",
+        "ALTER TABLE users ADD COLUMN locale TEXT DEFAULT 'ko'",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass
+
+
+# ── Auth ──────────────────────────────────────────────────────
+
+class AuthBody(BaseModel):
+    username: str
+    password: str
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+    school: Optional[str] = None
+    major: Optional[str] = None
+
+
+class ProfileUpdate(BaseModel):
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    school: Optional[str] = None
+    major: Optional[str] = None
+    locale: Optional[str] = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+def _user_dict(user: models.User) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "display_name": user.display_name,
+        "school": user.school,
+        "major": user.major,
+        "plan": user.plan or "free",
+        "locale": user.locale or "ko",
+        "created_at": user.created_at.strftime("%Y-%m-%d") if user.created_at else "",
+    }
+
+
+@app.post("/api/auth/register")
+def register(body: AuthBody, db: Session = Depends(get_db)):
+    if len(body.username.strip()) < 3:
+        raise HTTPException(status_code=400, detail="아이디는 3자 이상이어야 합니다.")
+    if len(body.password) < 4:
+        raise HTTPException(status_code=400, detail="비밀번호는 4자 이상이어야 합니다.")
+    if db.query(models.User).filter(models.User.username == body.username).first():
+        raise HTTPException(status_code=400, detail="이미 사용 중인 아이디입니다.")
+    salt = secrets.token_hex(16)
+    user = models.User(
+        username=body.username.strip(),
+        password_hash=auth.hash_password(body.password, salt),
+        salt=salt,
+        email=body.email,
+        display_name=body.display_name,
+        school=body.school,
+        major=body.major,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = auth.create_session(user.id, db)
+    return {"token": token, "user": _user_dict(user)}
+
+
+@app.post("/api/auth/login")
+def login(body: AuthBody, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == body.username.strip()).first()
+    if not user or not auth.verify_password(body.password, user.salt, user.password_hash):
+        raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
+    token = auth.create_session(user.id, db)
+    return {"token": token, "user": _user_dict(user)}
+
+
+@app.post("/api/auth/logout")
+def logout(authorization: str = Header(default=None), db: Session = Depends(get_db)):
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1]
+        db.query(models.Session).filter(models.Session.token == token).delete()
+        db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def me(current_user: models.User = Depends(auth.get_current_user)):
+    return _user_dict(current_user)
+
+
+@app.patch("/api/auth/me")
+def update_profile(
+    body: ProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    if body.display_name is not None:
+        current_user.display_name = body.display_name
+    if body.email is not None:
+        current_user.email = body.email
+    if body.school is not None:
+        current_user.school = body.school
+    if body.major is not None:
+        current_user.major = body.major
+    if body.locale is not None:
+        current_user.locale = body.locale
+    db.commit()
+    db.refresh(current_user)
+    return _user_dict(current_user)
+
+
+@app.patch("/api/auth/password")
+def change_password(
+    body: PasswordChange,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    if not auth.verify_password(body.current_password, current_user.salt, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="현재 비밀번호가 올바르지 않습니다.")
+    if len(body.new_password) < 4:
+        raise HTTPException(status_code=400, detail="새 비밀번호는 4자 이상이어야 합니다.")
+    new_salt = secrets.token_hex(16)
+    current_user.salt = new_salt
+    current_user.password_hash = auth.hash_password(body.new_password, new_salt)
+    # 다른 세션 무효화 (현재 세션 제외)
+    db.query(models.Session).filter(models.Session.user_id == current_user.id).delete()
+    db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/auth/me")
+def delete_account(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    db.delete(current_user)
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/auth/stats")
+def user_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    lecture_count = db.query(models.Lecture).filter(models.Lecture.user_id == current_user.id).count()
+    note_ids = [
+        o.id for o in db.query(models.Output.id)
+        .join(models.Lecture, models.Output.lecture_id == models.Lecture.id)
+        .filter(models.Lecture.user_id == current_user.id)
+        .all()
+    ]
+    note_count = len(note_ids)
+    return {
+        "lecture_count": lecture_count,
+        "note_count": note_count,
+    }
+
+
+# ── Lectures ──────────────────────────────────────────────────
+
 @app.get("/api/lectures")
-def list_lectures(db: Session = Depends(get_db)):
-    """등록된 강의 목록을 반환한다."""
-    lectures = db.query(models.Lecture).order_by(models.Lecture.id.desc()).all()
+def list_lectures(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    lectures = (
+        db.query(models.Lecture)
+        .filter(models.Lecture.user_id == current_user.id)
+        .order_by(models.Lecture.id.desc())
+        .all()
+    )
     return [
         {"id": l.id, "title": l.title, "subject": l.subject,
          "created_at": l.created_at.strftime("%Y-%m-%d") if l.created_at else ""}
@@ -37,9 +226,15 @@ def list_lectures(db: Session = Depends(get_db)):
 
 
 @app.delete("/api/lectures/{lecture_id}")
-def delete_lecture(lecture_id: int, db: Session = Depends(get_db)):
-    """강의를 삭제한다. 연결된 소스·노트도 cascade 삭제된다."""
-    lecture = db.query(models.Lecture).filter(models.Lecture.id == lecture_id).first()
+def delete_lecture(
+    lecture_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    lecture = db.query(models.Lecture).filter(
+        models.Lecture.id == lecture_id,
+        models.Lecture.user_id == current_user.id,
+    ).first()
     if not lecture:
         raise HTTPException(status_code=404, detail="강의를 찾을 수 없습니다.")
     db.delete(lecture)
@@ -51,10 +246,8 @@ def delete_lecture(lecture_id: int, db: Session = Depends(get_db)):
 async def create_step0(
     syllabus_file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
 ):
-    """강의계획서를 업로드하면 LLM이 Step 0 로드맵을 분석하고 과목명·교수명을 자동 추출한다."""
-
-    # 1. 업로드 파일에서 텍스트 추출
     file_bytes = await syllabus_file.read()
     content_type = syllabus_file.content_type or ""
     filename = syllabus_file.filename or ""
@@ -64,14 +257,15 @@ async def create_step0(
     else:
         syllabus_text = file_bytes.decode("utf-8")
 
-    # 2. LLM으로 Step 0 분석 수행
     step0_result = llm_service.analyze_syllabus(syllabus_text)
-
-    # 3. Step 0 결과에서 과목명·교수명 자동 추출
     title, subject = llm_service.extract_lecture_meta(step0_result)
 
-    # 4. Lecture 레코드 저장
-    lecture = models.Lecture(title=title, subject=subject, step0_analysis=step0_result)
+    lecture = models.Lecture(
+        user_id=current_user.id,
+        title=title,
+        subject=subject,
+        step0_analysis=step0_result,
+    )
     db.add(lecture)
     db.commit()
     db.refresh(lecture)
@@ -92,30 +286,38 @@ async def generate_note(
     audio_file: Optional[UploadFile] = File(None),
     note_text: Optional[str] = Form(None),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Step 0가 저장된 강의에 대해 주차별 소스를 받아 통합 요약 노트를 SSE로 스트리밍한다."""
-
-    # 1. lecture_id로 Lecture 조회 → step0_analysis 확보
-    lecture = db.query(models.Lecture).filter(models.Lecture.id == lecture_id).first()
+    lecture = db.query(models.Lecture).filter(
+        models.Lecture.id == lecture_id,
+        models.Lecture.user_id == current_user.id,
+    ).first()
     if not lecture:
         raise HTTPException(status_code=404, detail=f"lecture_id {lecture_id}에 해당하는 강의가 없습니다.")
 
     step0 = lecture.step0_analysis or ""
 
-    # 2. PDF 텍스트 추출
-    pdf_text = ""
-    if pdf_file:
-        pdf_bytes = await pdf_file.read()
-        pdf_text = pdf_parser.extract_text_from_pdf(pdf_bytes)
+    # PDF + STT 병렬 처리
+    pdf_bytes   = (await pdf_file.read())   if pdf_file   else None
+    audio_bytes = (await audio_file.read()) if audio_file else None
+    audio_mime  = (audio_file.content_type or "audio/mp4") if audio_file else "audio/mp4"
 
-    # 3. STT 텍스트 추출 (블로킹 - 스트리밍 시작 전에 완료)
-    stt_text = ""
-    if audio_file:
-        audio_bytes = await audio_file.read()
-        mime = audio_file.content_type or "audio/mp4"
-        stt_text = stt_service.process_audio_to_text(audio_bytes, mime_type=mime)
+    loop = asyncio.get_event_loop()
 
-    # 4. 4가지 소스를 단일 컨텍스트로 병합
+    async def _run_pdf():
+        if pdf_bytes:
+            return await loop.run_in_executor(None, pdf_parser.extract_text_from_pdf, pdf_bytes)
+        return ""
+
+    async def _run_stt():
+        if audio_bytes:
+            return await loop.run_in_executor(
+                None, stt_service.process_audio_to_text, audio_bytes, audio_mime
+            )
+        return ""
+
+    pdf_text, stt_text = await asyncio.gather(_run_pdf(), _run_stt())
+
     aggregated = aggregator.aggregate_sources(
         step0=step0,
         pdf_text=pdf_text,
@@ -123,13 +325,11 @@ async def generate_note(
         note_text=note_text or "",
     )
 
-    # 5. 원본 소스를 Source 테이블에 저장 (스트리밍 전에 커밋)
     for source_type, content in [("PDF", pdf_text), ("STT", stt_text), ("NOTE", note_text or "")]:
         if content:
             db.add(models.Source(lecture_id=lecture_id, type=source_type, content=content))
     db.commit()
 
-    # 6. LLM 스트리밍 → SSE 응답
     def event_stream():
         full_text = ""
         try:
@@ -140,7 +340,6 @@ async def generate_note(
             yield f"data: {json.dumps({'t': 'err', 'msg': str(e)})}\n\n"
             return
 
-        # 스트리밍 완료 후 Output 저장
         save_db = SessionLocal()
         try:
             output = models.Output(lecture_id=lecture_id, week=week, summary=full_text)
@@ -159,11 +358,23 @@ async def generate_note(
 
 
 @app.get("/api/lectures/{lecture_id}/notes")
-def list_notes(lecture_id: int, db: Session = Depends(get_db)):
-    """특정 강의의 노트 목록을 반환한다."""
-    outputs = db.query(models.Output).filter(
-        models.Output.lecture_id == lecture_id
-    ).order_by(models.Output.id.asc()).all()
+def list_notes(
+    lecture_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    lecture = db.query(models.Lecture).filter(
+        models.Lecture.id == lecture_id,
+        models.Lecture.user_id == current_user.id,
+    ).first()
+    if not lecture:
+        raise HTTPException(status_code=404, detail="강의를 찾을 수 없습니다.")
+    outputs = (
+        db.query(models.Output)
+        .filter(models.Output.lecture_id == lecture_id)
+        .order_by(models.Output.id.asc())
+        .all()
+    )
     return [
         {"id": o.id, "week": o.week,
          "created_at": o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else ""}
@@ -172,11 +383,21 @@ def list_notes(lecture_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/notes/{output_id}")
-def get_note(output_id: int, db: Session = Depends(get_db)):
-    """노트 내용을 JSON으로 반환한다."""
+def get_note(
+    output_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
     output = db.query(models.Output).filter(models.Output.id == output_id).first()
     if not output:
         raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+    # 소유권 확인
+    lecture = db.query(models.Lecture).filter(
+        models.Lecture.id == output.lecture_id,
+        models.Lecture.user_id == current_user.id,
+    ).first()
+    if not lecture:
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
     return {
         "id": output.id,
         "lecture_id": output.lecture_id,
@@ -186,11 +407,20 @@ def get_note(output_id: int, db: Session = Depends(get_db)):
 
 
 @app.delete("/api/notes/{output_id}")
-def delete_note(output_id: int, db: Session = Depends(get_db)):
-    """노트를 삭제한다."""
+def delete_note(
+    output_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
     output = db.query(models.Output).filter(models.Output.id == output_id).first()
     if not output:
         raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+    lecture = db.query(models.Lecture).filter(
+        models.Lecture.id == output.lecture_id,
+        models.Lecture.user_id == current_user.id,
+    ).first()
+    if not lecture:
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
     db.delete(output)
     db.commit()
     return {"ok": True}
@@ -201,23 +431,53 @@ class NoteUpdate(BaseModel):
 
 
 @app.patch("/api/notes/{output_id}")
-def update_note(output_id: int, body: NoteUpdate, db: Session = Depends(get_db)):
-    """노트 내용을 수정한다."""
+def update_note(
+    output_id: int,
+    body: NoteUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
     output = db.query(models.Output).filter(models.Output.id == output_id).first()
     if not output:
         raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+    lecture = db.query(models.Lecture).filter(
+        models.Lecture.id == output.lecture_id,
+        models.Lecture.user_id == current_user.id,
+    ).first()
+    if not lecture:
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
     output.summary = body.summary
     db.commit()
     return {"ok": True}
 
 
 @app.get("/api/download-note/{output_id}")
-def download_note(output_id: int, db: Session = Depends(get_db)):
-    """저장된 노트를 HTML 파일로 다운로드한다. 브라우저에서 열고 Ctrl+P로 PDF 저장 가능."""
-
+def download_note(
+    output_id: int,
+    token: Optional[str] = None,
+    db: Session = Depends(get_db),
+    authorization: str = Header(default=None),
+):
+    # Accept token from query param (for window.open downloads) or header
+    raw_token = token or (authorization.split(" ", 1)[1] if authorization and authorization.startswith("Bearer ") else None)
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    session = db.query(models.Session).filter(
+        models.Session.token == raw_token,
+        models.Session.expires_at > datetime.now(timezone.utc),
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="세션이 만료되었습니다.")
+    current_user = session.user
     output = db.query(models.Output).filter(models.Output.id == output_id).first()
     if not output:
         raise HTTPException(status_code=404, detail=f"output_id {output_id}에 해당하는 노트가 없습니다.")
+    lecture = db.query(models.Lecture).filter(
+        models.Lecture.id == output.lecture_id,
+        models.Lecture.user_id == current_user.id,
+    ).first()
+    if not lecture:
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
 
     html_body = markdown.markdown(
         output.summary,

@@ -87,26 +87,41 @@ Step 0 분석 결과(주차별 커리큘럼, 핵심 용어 사전, 교수법 방
 
 ## 6. 운영 제약 및 현재 상태
 
-### API 엔드포인트 (9개)
+### API 엔드포인트 (17개)
+
+**Auth**
+
+| 메서드 | 경로 | 기능 |
+|---|---|---|
+| POST | `/api/auth/register` | 회원가입 (username, password, display_name, school, major) |
+| POST | `/api/auth/login` | 로그인 → Bearer 토큰 반환 |
+| POST | `/api/auth/logout` | 세션 토큰 무효화 |
+| GET | `/api/auth/me` | 현재 사용자 정보 조회 |
+| PATCH | `/api/auth/me` | 프로필 수정 (display_name, school, major, locale) |
+| PATCH | `/api/auth/password` | 비밀번호 변경 (기존 세션 전체 무효화) |
+| DELETE | `/api/auth/me` | 계정 및 모든 데이터 삭제 |
+| GET | `/api/auth/stats` | 사용자 강의·노트 통계 |
+
+**Core Pipeline (사용자 인증 필수)**
 
 | 메서드 | 경로 | 기능 |
 |---|---|---|
 | POST | `/api/create-step0` | 강의계획서 분석 → 커리큘럼 구조 추출 및 저장 |
 | POST | `/api/generate-note` | 멀티소스 인제스천 → SSE 스트리밍 노트 생성 |
-| GET | `/api/lectures` | 등록된 컨텍스트 목록 |
-| DELETE | `/api/lectures/{id}` | 컨텍스트 및 연관 레코드 삭제 (cascade) |
-| GET | `/api/lectures/{id}/notes` | 특정 컨텍스트 하위 출력물 목록 |
+| GET | `/api/lectures` | 로그인 사용자의 강의 목록 |
+| DELETE | `/api/lectures/{id}` | 강의 및 연관 레코드 삭제 (cascade) |
+| GET | `/api/lectures/{id}/notes` | 특정 강의 하위 노트 목록 |
 | GET | `/api/notes/{id}` | 구조화된 노트 조회 |
 | PATCH | `/api/notes/{id}` | 노트 편집 |
 | DELETE | `/api/notes/{id}` | 노트 삭제 |
-| GET | `/api/download-note/{id}` | HTML 형식 출력물 다운로드 |
+| GET | `/api/download-note/{id}` | HTML 형식 출력물 다운로드 (token 쿼리 파라미터 지원) |
 
 ### 현재 운영 제약
 
-- API 엔드포인트 대부분 예외 처리 미적용 — Gemini quota 초과, 업로드 실패 시 비구조적 오류 반환
-- API URL 하드코딩 (`localhost:8000`) — 배포 환경에서 동작 불가
+- API 엔드포인트 일부 예외 처리 미적용 — Gemini quota 초과, 업로드 실패 시 비구조적 오류 반환
 - SQLite 경로 미분리 — 컨테이너 재배포 시 데이터 소실 위험
 - `requirements.txt` 미생성
+- 비밀번호 SHA256 단방향 해시 (salt 포함) — alpha/beta 수준, bcrypt 전환 미적용
 
 → 배포 전 해결 필요. 상세 체크리스트는 [plan.md](plan.md) 참조.
 
@@ -114,17 +129,21 @@ Step 0 분석 결과(주차별 커리큘럼, 핵심 용어 사전, 교수법 방
 
 ## 7. 개발 로드맵
 
-### Phase 1 — 학기 내 앱 완성 (현재 진행 중)
+### Phase 1 — 학기 내 앱 완성 (진행 중)
 
 팀 프로젝트 발표 일정에 맞춰 목표한 기능을 완성하는 것이 우선이다.
 
-| 항목 | 내용 | 우선순위 |
+| 항목 | 내용 | 상태 |
 |---|---|---|
-| PWA 매니페스트 | `manifest.json` 추가 → 모바일 홈 화면 설치 가능 | 높음 |
-| 파이프라인 스텝 인디케이터 | 처리 단계 시각화 UI (Ingestion → STT → Aggregation → Generation) | 높음 |
-| 처리 메타데이터 표시 | 노트 완료 후 소스 구성·처리 시간 표시 | 중간 |
-| 이미지 입력 지원 | Gemini Vision 기반 칠판 사진·필기 이미지 처리 | 중간 |
-| 노트 키워드 검색 | 생성된 노트 내 전문 검색 기능 | 낮음 |
+| ✅ 파이프라인 스텝 인디케이터 | Pipeline A 디자인 — 연결선·서브텍스트·N/5 카운터 | 완료 |
+| ✅ STT 성능 최적화 | `thinking_budget=0` + PDF·STT 병렬 처리 (`asyncio.gather`) | 완료 |
+| ✅ 스트리밍 자동 스크롤 | 생성 중 하단 자동 스크롤 + 수동 조작 시 멈춤 | 완료 |
+| ✅ 로그인·사용자 인증 | 온보딩·로그인·회원가입 화면, 세션 토큰, 사용자별 데이터 격리 | 완료 |
+| ✅ 프로필 화면 | Profile B — 그라디언트 헤더, 통계, 프로필 편집, 비밀번호 변경, 계정 삭제 | 완료 |
+| PWA 매니페스트 | `manifest.json` 추가 → 모바일 홈 화면 설치 가능 | 대기 |
+| 처리 메타데이터 표시 | 노트 완료 후 소스 구성·처리 시간 표시 | 대기 |
+| 이미지 입력 지원 | Gemini Vision 기반 칠판 사진·필기 이미지 처리 | 대기 |
+| 노트 키워드 검색 | 생성된 노트 내 전문 검색 기능 | 대기 |
 
 ### Phase 2 — 배포 및 포트폴리오 정리 (학기 종료 후)
 

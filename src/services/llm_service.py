@@ -57,7 +57,13 @@ def extract_lecture_meta(step0_text: str) -> tuple[str, str]:
         + step0_text[:3000]
     )
     try:
-        response = _client.models.generate_content(model=_MODEL_ID, contents=prompt)
+        response = _client.models.generate_content(
+            model=_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            ),
+        )
         text = response.text or ""
         title = subject = "미확인"
         for line in text.splitlines():
