@@ -40,10 +40,12 @@
 ```
 lecture_note_project/
 ├── .env                        # Gemini API Key 등 환경변수 (Git 제외 필수)
+├── .gitignore                  # .env, __pycache__, data/lecture.db, data/examples/ 제외
+├── render.yaml                 # Render 배포 설정 (서비스 타입, 빌드·시작 커맨드, 환경변수)
 ├── launch.bat                  # 서버 실행: uvicorn main:app --reload --app-dir src
 │
 ├── src/                        # Python 백엔드 소스
-│   ├── main.py                 # FastAPI 앱 진입점, 17개 API 엔드포인트
+│   ├── main.py                 # FastAPI 앱 진입점, 19개 API 엔드포인트
 │   ├── auth.py                 # 인증 유틸 (hash, session, get_current_user)
 │   ├── database.py             # SQLAlchemy 엔진 및 세션
 │   ├── models.py               # ORM 모델 (User, Session, Lecture, Source, Output)
@@ -62,8 +64,8 @@ lecture_note_project/
 │       └── icons.svg           # SVG 아이콘 스프라이트 (37개)
 │
 ├── data/
-│   ├── lecture.db              # SQLite DB (Git 제외 권장)
-│   └── examples/               # 테스트용 샘플 입력 파일
+│   ├── .gitkeep                # data/ 디렉터리 Git 추적용 (내용 없음)
+│   └── lecture.db              # SQLite DB (Git 제외 — .gitignore 적용)
 │
 ├── package/                    # Android 패키징 (Capacitor)
 │   ├── capacitor.config.ts
@@ -116,13 +118,14 @@ uvicorn main:app --reload --app-dir src
 
 ---
 
-## Git 아카이브 시 제외 권장 항목
+## Git 아카이브 시 제외 항목
 
 ```gitignore
 .env
 __pycache__/
 *.pyc
 data/lecture.db
+data/examples/
 ```
 
-`data/examples/`의 샘플 파일은 데모용으로 포함 여부를 선택적으로 결정.
+`data/examples/`는 저작권 이슈로 Git 추적에서 제외. `data/` 디렉터리 자체는 `data/.gitkeep`으로 유지.

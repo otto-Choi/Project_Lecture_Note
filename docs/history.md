@@ -429,6 +429,93 @@ Claude 디자인으로 작성된 JSX 프로토타입 파일(`update/` → `docs/
 
 ---
 
+## 12단계: 베타 기능 완성 — Gen-banner·아이디찾기·프로필 확장 (2026-05-15)
+
+### 목표
+
+`docs/design/README_AUTH.md`에 설계된 나머지 기능을 전부 구현. 이전 단계(11단계)까지 반영되지 않은 항목 일괄 완성.
+
+### 구현 1: 백그라운드 노트 생성 + Gen-banner
+
+**문제**: 노트 생성 중 로딩 오버레이가 전체 화면을 덮어 다른 탭으로 이동 불가.
+
+**해결**: `showLoad()`/`hideLoad()` 방식 → 상단 고정 gen-banner 방식으로 교체.
+
+- SSE 루프는 원래 논블로킹이었으나 오버레이가 UX를 차단하고 있었음
+- `gen-banner`: 진행 중 펄스 애니메이션·경과 시간 카운터·현재 파이프라인 단계 표시
+- 완료 시 `.done` 클래스 + "보기 →" 버튼 → 해당 노트로 즉시 이동
+- 오류 시 `.error` 클래스 전환
+- 사용자는 생성 중에도 다른 탭을 자유롭게 탐색 가능
+
+```js
+showGenBanner('음성 처리 중', '음성을 텍스트로 변환하고 있습니다.');
+// SSE 진행 중 updateGenBanner() 호출로 단계 표시 갱신
+// 완료: completeGenBanner() → "보기 →" 버튼 표시
+```
+
+### 구현 2: 아이디 찾기 / 비밀번호 찾기
+
+- `#screen-find`: 로그인 화면의 "아이디·비밀번호 찾기" 링크로 진입하는 별도 화면
+- 탭 방식으로 "아이디 찾기" / "비밀번호 찾기" 전환 (`switchFindTab`)
+- `POST /api/auth/find-id`: `display_name` + 선택적 `school` → 매칭되는 `username` 반환
+- `POST /api/auth/find-pw`: `username` → 가입 이메일 앞 3자리 + `***`로 마스킹된 전송 메시지 반환 (데모용, 실제 이메일 발송 미구현)
+- 성공 시 `.auth-err-banner.ok` (녹색), 실패 시 기본 빨간 배너
+
+### 구현 3: 회원가입 강화
+
+**이메일 필드**
+- Step 1에 선택 입력 `email` 필드 추가
+- `POST /api/auth/register` 요청 바디에 포함
+- 비밀번호 찾기 기능의 연락처로 사용
+
+**비밀번호 강도 게이지**
+- 8자 이상 / 영문 포함 / 숫자 포함 / 특수문자 포함 → 0~4점 환산
+- 막대 너비 + 색상(red → orange → yellow → green → #1A2D5E)으로 시각화
+- `calcPwStrength()` / `updatePwStrength()` — 회원가입·비밀번호 변경 화면 공용
+
+**이용약관 동의 (Step 2)**
+- [필수] 이용약관, [필수] 개인정보처리방침, [선택] 마케팅 수신 체크박스
+- "전체 동의" 마스터 체크박스 (`toggleAllTerms`)
+- 필수 2개 미체크 시 "가입하고 시작하기" 버튼 비활성화 유지 (`checkTermsReq`)
+
+### 구현 4: 프로필 화면 확장
+
+**가입 정보 화면** (`#account-info-screen`)
+- 아이디, 이메일, 학교, 전공, 가입일, 계획서 분석 건수 조회
+
+**구독 플랜 화면** (`#plan-screen`)
+- Free / Pro / Team 3개 플랜 카드 비교 (인기 배지, 가격, 기능 목록)
+- 현재 플랜 강조 표시, Pro/Team 선택 시 "준비 중" 토스트
+
+**언어 설정 화면** (`#language-screen`)
+- 한국어 / English / 日本語 / 中文(简体) 선택
+- `PATCH /api/auth/me` → `locale` 필드 업데이트
+- `renderProfileHeader()`가 즉시 반영
+
+**이번 주 통계**
+- 프로필 헤더 통계에 "이번 주" 항목 추가
+- `GET /api/auth/stats` → `notes_this_week` (7일 이내 생성 노트 수)
+
+### 구현 5: 계정 삭제 확인 입력
+
+- 기존: 버튼 클릭만으로 삭제 가능
+- 변경: "탈퇴합니다" 문자열 직접 입력 후 버튼 활성화 (`checkDelConfirm`)
+
+### 구현 6: Render 배포 + API URL
+
+- Railway 무료 한도 소진 → Render 무료 플랜으로 전환
+- `render.yaml` 생성 (서비스 타입, 빌드/시작 커맨드, `GEMINI_API_KEY` 환경변수 선언)
+- 배포 URL: `https://lecture-note-2cb6.onrender.com`
+- `app.js` `DEFAULT_PROD_API` 업데이트
+- Render 무료 플랜 특성: 15분 미사용 시 슬립 → 최초 요청 약 30초 콜드 스타트
+
+### 버그 수정
+
+- `resetSignupForm()`: `reg-pw-strength-label` div의 텍스트가 초기화되지 않던 문제 → 두 요소 각각 처리
+- `resetFindForm()`: find 화면 재진입 시 탭이 기본값(아이디 찾기)으로 리셋되지 않던 문제 → `switchFindTab('id')` 호출 추가
+
+---
+
 ## 최종 환경 설정
 
 ### 설치 패키지
@@ -455,7 +542,7 @@ GEMINI_API_KEY=...
 
 | 파일 | 상태 |
 |------|------|
-| `src/main.py` | 완료 (엔드포인트 17개, 인증, CORS, SSE 스트리밍, 병렬 처리) |
+| `src/main.py` | 완료 (엔드포인트 19개, 인증, CORS, SSE 스트리밍, 병렬 처리) |
 | `src/auth.py` | 완료 (hash, verify, session, get_current_user) |
 | `src/database.py` | 완료 |
 | `src/models.py` | 완료 (User, Session, Lecture, Source, Output) |
@@ -472,7 +559,7 @@ GEMINI_API_KEY=...
 
 ---
 
-## API 엔드포인트 요약 (17개)
+## API 엔드포인트 요약 (19개)
 
 **Auth**
 
@@ -485,7 +572,9 @@ GEMINI_API_KEY=...
 | PATCH | `/api/auth/me` | 프로필 수정 |
 | PATCH | `/api/auth/password` | 비밀번호 변경 |
 | DELETE | `/api/auth/me` | 계정 삭제 |
-| GET | `/api/auth/stats` | 통계 |
+| GET | `/api/auth/stats` | 통계 (이번 주 포함) |
+| POST | `/api/auth/find-id` | 아이디 찾기 (이름·학교로 조회) |
+| POST | `/api/auth/find-pw` | 비밀번호 찾기 (등록 이메일로 안내) |
 
 **Core**
 

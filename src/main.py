@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, Form, UploadFile, File, Depends, HTTPException, Header
 from fastapi.responses import Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -186,6 +186,38 @@ def delete_account(
     return {"ok": True}
 
 
+class FindIdBody(BaseModel):
+    display_name: str
+    school: Optional[str] = None
+
+class FindPwBody(BaseModel):
+    username: str
+
+@app.post("/api/auth/find-id")
+def find_id(body: FindIdBody, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(
+        models.User.display_name == body.display_name.strip()
+    ).first()
+    if body.school:
+        user = db.query(models.User).filter(
+            models.User.display_name == body.display_name.strip(),
+            models.User.school == body.school.strip(),
+        ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="일치하는 계정을 찾을 수 없습니다.")
+    return {"username": user.username}
+
+@app.post("/api/auth/find-pw")
+def find_pw(body: FindPwBody, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == body.username.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="해당 아이디로 가입된 계정이 없습니다.")
+    if not user.email:
+        raise HTTPException(status_code=400, detail="가입 시 이메일을 등록하지 않아 임시 비밀번호를 발송할 수 없습니다.")
+    # 실제 이메일 발송 없이 안내 메시지만 반환 (데모 단계)
+    return {"message": f"{user.email[:3]}***로 임시 비밀번호를 전송했습니다. (데모: 실제 발송 미구현)"}
+
+
 @app.get("/api/auth/stats")
 def user_stats(
     db: Session = Depends(get_db),
@@ -199,9 +231,20 @@ def user_stats(
         .all()
     ]
     note_count = len(note_ids)
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    notes_this_week = (
+        db.query(models.Output)
+        .join(models.Lecture, models.Output.lecture_id == models.Lecture.id)
+        .filter(
+            models.Lecture.user_id == current_user.id,
+            models.Output.created_at >= week_ago,
+        )
+        .count()
+    )
     return {
         "lecture_count": lecture_count,
         "note_count": note_count,
+        "notes_this_week": notes_this_week,
     }
 
 

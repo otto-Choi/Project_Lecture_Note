@@ -1,6 +1,6 @@
 # LectureNote — 배포 및 포트폴리오 플랜
 
-> 목표: 로컬 시연 → Railway 외부 배포 + GitHub 포트폴리오 아카이브  
+> 목표: 로컬 시연 → Render 외부 배포 + GitHub 포트폴리오 아카이브  
 > 업데이트: 2026-05-15
 
 ---
@@ -9,12 +9,12 @@
 
 | 레이어 | 기술 | 비고 |
 |---|---|---|
-| 백엔드 | FastAPI + Python | 17개 API 엔드포인트, SSE 스트리밍 |
+| 백엔드 | FastAPI + Python | 19개 API 엔드포인트, SSE 스트리밍 |
 | DB | SQLite | `data/lecture.db` |
 | AI | Gemini 2.5-flash | LLM 생성 + STT + 컨텍스트 분석 단일 API |
 | 인증 | 세션 토큰 (Bearer) | SHA256+salt 해시, 72h TTL, localStorage 자동 로그인 |
 | 프론트 | Vanilla HTML/CSS/JS | 멀티스크린 SPA (Auth / Main App / Profile) |
-| 배포 | Railway | `https://web-production-94071.up.railway.app` |
+| 배포 | Render | `https://lecture-note-2cb6.onrender.com` (무료 플랜, 15분 슬립) |
 
 이 구조는 현재 검증 단계에 맞게 의도적으로 경량화된 선택이다. Docker/K8s, PostgreSQL, React 빌드 파이프라인은 현재 운영 규모에서 불필요한 복잡도를 추가할 뿐이다. 트래픽 검증 이후 단계적 전환이 올바른 순서다.
 
@@ -144,6 +144,15 @@ web: uvicorn main:app --host 0.0.0.0 --port $PORT --app-dir src
 | ✅ 사용자 인증 시스템 | 로그인·회원가입·세션 토큰·사용자별 데이터 격리 | 완료 |
 | ✅ 파이프라인 스텝 인디케이터 | Pipeline A — 연결선·서브텍스트·경과시간 카운터 | 완료 |
 | ✅ 프로필 화면 | Profile B — 통계·편집·비밀번호 변경·계정 삭제 | 완료 |
+| ✅ 백그라운드 노트 생성 | Gen-banner — 생성 중에도 다른 탭 자유 탐색 가능 | 완료 |
+| ✅ 아이디/비밀번호 찾기 | 이름·학교로 아이디 찾기, 등록 이메일로 비밀번호 안내 | 완료 |
+| ✅ 구독 플랜 화면 | Free/Pro/Team 플랜 비교 카드 (결제 기능 준비 중) | 완료 |
+| ✅ 언어 설정 화면 | 한국어/English/日本語/中文 선택, DB 즉시 반영 | 완료 |
+| ✅ 가입 정보 화면 | 계정 상세 정보 조회 화면 | 완료 |
+| ✅ 비밀번호 강도 게이지 | 회원가입·비밀번호 변경 화면 공용 시각 지표 | 완료 |
+| ✅ 이용약관 동의 | 필수 2개 미동의 시 가입 버튼 비활성화 | 완료 |
+| ✅ 이메일 필드 | 회원가입 Step 1 — 비밀번호 찾기 연락처 | 완료 |
+| ✅ Render 배포 | `render.yaml` + 환경변수 설정, 자동 배포 | 완료 |
 | PWA 매니페스트 | `manifest.json` + 아이콘 추가 → 모바일 홈 화면 설치 | 대기 (1시간) |
 | 처리 메타데이터 표시 | 노트 완료 후 소스 구성·처리 시간 표시 | 대기 (1시간) |
 | 이미지 입력 지원 | Gemini Vision 기반 칠판 사진·필기 이미지 처리 | 대기 (3~4시간) |
@@ -154,14 +163,16 @@ web: uvicorn main:app --host 0.0.0.0 --port $PORT --app-dir src
 ## 배포 순서
 
 ```
-1. 위 필수 수정 6개 적용
+1. 위 필수 수정 항목 적용 확인
 2. GitHub repo push (.env 제외 확인)
-3. railway.app → New Project → Deploy from GitHub
-4. Railway 대시보드: Variables → GEMINI_API_KEY 입력
-5. Railway: Add Volume → Mount Path: /data
-6. 배포 완료 후 /health 접속 확인
-7. 발급된 URL로 외부 접속 테스트
-8. (선택) manifest.json 추가 → PWA 설치 배너 확인
+3. render.com → New Web Service → Deploy from GitHub
+4. Render 대시보드: Environment → GEMINI_API_KEY 입력
+5. 배포 완료 후 /health 접속 확인
+6. 발급된 URL로 외부 접속 테스트
+7. (선택) manifest.json 추가 → PWA 설치 배너 확인
+
+※ 현재 배포 URL: https://lecture-note-2cb6.onrender.com (render.yaml 기반 자동 배포)
+※ Render 무료 플랜: 15분 비활성 시 슬립 → 최초 요청 약 30초 콜드 스타트
 ```
 
 ---

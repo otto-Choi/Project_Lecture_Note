@@ -3,7 +3,7 @@
    ============================================================ */
 
 // ── API base ───────────────────────────────────────────────
-const DEFAULT_PROD_API = 'https://web-production-94071.up.railway.app';
+const DEFAULT_PROD_API = 'https://lecture-note-2cb6.onrender.com';
 
 function resolveApiBase() {
   const proto = location.protocol;
@@ -90,12 +90,12 @@ function showAuthRoot(show) {
 }
 
 function showAuthScreen(name) {
-  ['onboarding', 'login', 'signup'].forEach(n => {
+  ['onboarding', 'login', 'signup', 'find'].forEach(n => {
     const el = $(`screen-${n}`);
     if (el) el.style.display = n === name ? 'flex' : 'none';
   });
-  // reset signup state on fresh open
   if (name === 'signup') resetSignupForm();
+  if (name === 'find') resetFindForm();
 }
 window.showAuthScreen = showAuthScreen;
 
@@ -140,6 +140,123 @@ async function doLogin() {
 }
 window.doLogin = doLogin;
 
+// ── Password strength ──────────────────────────────────────
+function calcPwStrength(pw) {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[a-zA-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^a-zA-Z0-9]/.test(pw)) score++;
+  return score; // 0-4
+}
+
+function updatePwStrength(inputId, barId) {
+  const pw = $(inputId).value;
+  const bar = $(barId);
+  if (!bar) return;
+  const barInner = bar.querySelector('.pw-strength-bar');
+  const labelId = barId.replace('strength', 'strength-label');
+  const label = $(labelId);
+  const score = calcPwStrength(pw);
+  const levels = ['', '약함', '보통', '강함', '매우 강함'];
+  const colors = ['', '#e53e3e', '#f6ad55', '#4B82C5', '#38a169'];
+  const pct = pw.length ? [0, 25, 50, 75, 100][score] : 0;
+  if (barInner) { barInner.style.width = pct + '%'; barInner.style.background = colors[score] || '#e5e7eb'; }
+  if (label) { label.textContent = pw.length ? levels[score] : ''; label.style.color = colors[score] || ''; }
+  // Rules checklist (change-pw only)
+  const rules = $('cp-pw-rules');
+  if (rules && inputId === 'cp-new') {
+    const set = (id, ok) => { const el = $(id); if (el) el.classList.toggle('ok', ok); };
+    set('pr-len', pw.length >= 8);
+    set('pr-eng', /[a-zA-Z]/.test(pw));
+    set('pr-num', /[0-9]/.test(pw));
+    set('pr-sym', /[^a-zA-Z0-9]/.test(pw));
+  }
+}
+window.updatePwStrength = updatePwStrength;
+
+// ── Terms ──────────────────────────────────────────────────
+function toggleAllTerms(allCb) {
+  document.querySelectorAll('#signup-step2 input[type=checkbox]').forEach(cb => { cb.checked = allCb.checked; });
+  checkTermsReq();
+}
+function checkTermsReq() {
+  const allReq = [...document.querySelectorAll('.terms-required')].every(cb => cb.checked);
+  $('btn-signup-submit').disabled = !allReq;
+  const allCb = $('terms-all');
+  if (allCb) allCb.checked = [...document.querySelectorAll('#signup-step2 input[type=checkbox]:not(#terms-all)')].every(cb => cb.checked);
+}
+window.toggleAllTerms = toggleAllTerms;
+window.checkTermsReq  = checkTermsReq;
+
+// ── Find account ───────────────────────────────────────────
+function resetFindForm() {
+  ['find-name','find-school','find-pw-username'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+  ['find-id-result','find-pw-result'].forEach(id => { const el = $(id); if (el) { el.textContent = ''; el.classList.remove('show'); } });
+  switchFindTab('id');
+}
+
+function switchFindTab(tab) {
+  $('find-id-form').style.display = tab === 'id' ? 'block' : 'none';
+  $('find-pw-form').style.display = tab === 'pw' ? 'block' : 'none';
+  $('find-tab-id').classList.toggle('active', tab === 'id');
+  $('find-tab-pw').classList.toggle('active', tab === 'pw');
+}
+window.switchFindTab = switchFindTab;
+
+async function doFindId() {
+  const name   = $('find-name').value.trim();
+  const school = $('find-school').value.trim();
+  const res    = $('find-id-result');
+  res.classList.remove('show');
+  if (!name) { res.textContent = '이름을 입력해주세요.'; res.className = 'auth-err-banner show'; return; }
+  try {
+    const r = await fetch(`${API}/api/auth/find-id`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_name: name, school }),
+    });
+    const d = await r.json();
+    if (r.ok && d.username) {
+      res.textContent = `아이디: ${d.username}`;
+      res.className = 'auth-err-banner ok show';
+    } else {
+      res.textContent = d.detail || '일치하는 계정을 찾을 수 없습니다.';
+      res.className = 'auth-err-banner show';
+    }
+  } catch {
+    res.textContent = '서버에 연결할 수 없습니다.';
+    res.className = 'auth-err-banner show';
+  }
+}
+window.doFindId = doFindId;
+
+async function doFindPw() {
+  const username = $('find-pw-username').value.trim();
+  const res = $('find-pw-result');
+  res.classList.remove('show');
+  if (!username) { res.textContent = '아이디를 입력해주세요.'; res.className = 'auth-err-banner show'; return; }
+  try {
+    const r = await fetch(`${API}/api/auth/find-pw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username }),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      res.textContent = d.message || '가입된 이메일로 임시 비밀번호를 전송했습니다.';
+      res.className = 'auth-err-banner ok show';
+    } else {
+      res.textContent = d.detail || '계정을 찾을 수 없습니다.';
+      res.className = 'auth-err-banner show';
+    }
+  } catch {
+    res.textContent = '서버에 연결할 수 없습니다.';
+    res.className = 'auth-err-banner show';
+  }
+}
+window.doFindPw = doFindPw;
+
 // ── Signup step 1 validation ───────────────────────────────
 function signupStep1Next() {
   const username  = $('reg-username').value.trim();
@@ -172,7 +289,8 @@ function signupStep1Next() {
   $('sp-line-1').classList.add('done');
   $('sp-dot-2').classList.add('active');
   $('signup-header-title').textContent = '추가 정보';
-  $('signup-header-sub').textContent = '선택사항이에요, 나중에도 입력 가능해요.';
+  $('signup-header-sub').textContent = '약관 동의 후 가입을 완료하세요.';
+  checkTermsReq();
 }
 window.signupStep1Next = signupStep1Next;
 
@@ -192,7 +310,11 @@ function signupBack() {
 window.signupBack = signupBack;
 
 function resetSignupForm() {
-  ['reg-username','reg-password','reg-password2','reg-display-name','reg-school','reg-major'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+  ['reg-username','reg-email','reg-password','reg-password2','reg-display-name','reg-school','reg-major'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+  ['terms-all','terms-use','terms-privacy','terms-mkt'].forEach(id => { const el = $(id); if (el) el.checked = false; });
+  $('btn-signup-submit').disabled = true;
+  const pwBar = $('reg-pw-strength')?.querySelector('.pw-strength-bar'); if (pwBar) pwBar.style.width = '0';
+  const pwLbl = $('reg-pw-strength-label'); if (pwLbl) pwLbl.textContent = '';
   $('signup-step1').style.display = 'block';
   $('signup-step2').style.display = 'none';
   $('sp-dot-1').className = 'signup-step-dot active';
@@ -206,6 +328,7 @@ function resetSignupForm() {
 async function doRegister() {
   const username    = $('reg-username').value.trim();
   const password    = $('reg-password').value;
+  const email       = $('reg-email').value.trim() || null;
   const displayName = $('reg-display-name').value.trim();
   const school      = $('reg-school').value.trim();
   const major       = $('reg-major').value.trim();
@@ -220,7 +343,7 @@ async function doRegister() {
     const r = await fetch(`${API}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, display_name: displayName || null, school: school || null, major: major || null }),
+      body: JSON.stringify({ username, password, email, display_name: displayName || null, school: school || null, major: major || null }),
     });
     const d = await r.json();
     if (!r.ok) {
@@ -295,6 +418,7 @@ async function openProfile() {
       const s = await r.json();
       $('profile-stat-lectures').textContent = s.lecture_count ?? '—';
       $('profile-stat-notes').textContent    = s.note_count ?? '—';
+      $('profile-stat-week').textContent     = s.notes_this_week ?? '—';
     }
   } catch {}
 
@@ -306,6 +430,9 @@ function closeProfile() {
   $('profile-screen').classList.remove('active');
   closeEditProfile();
   closeChangePw();
+  closeAccountInfo();
+  closePlanScreen();
+  closeLanguageScreen();
 }
 window.closeProfile = closeProfile;
 
@@ -316,10 +443,14 @@ function renderProfileHeader() {
   $('profile-avatar-initial').textContent = initial;
   $('profile-display-name').textContent = u.display_name || u.username;
   $('profile-username').textContent = `@${u.username}`;
-  $('profile-plan-text').textContent = u.plan === 'pro' ? 'Pro' : 'Free';
-  $('profile-plan-badge').classList.toggle('pro', u.plan === 'pro');
+  const planLabel = { pro: 'Pro', team: 'Team' }[u.plan] || 'Free';
+  $('profile-plan-text').textContent = planLabel;
+  $('profile-plan-badge').classList.toggle('pro', !!u.plan && u.plan !== 'free');
   $('profile-row-name').textContent = [u.display_name, u.school, u.major].filter(Boolean).join(' · ') || '편집하기';
+  $('profile-row-plan').textContent = planLabel;
   $('profile-dark-value').textContent = `현재: ${document.body.classList.contains('dark') ? '다크' : '라이트'}`;
+  const langNames = { ko: '한국어', en: 'English', ja: '日本語', zh: '中文(简体)' };
+  $('profile-row-lang').textContent = langNames[u.locale || 'ko'] || '한국어';
 }
 
 function openEditProfile() {
@@ -421,13 +552,100 @@ async function doChangePassword() {
 window.doChangePassword = doChangePassword;
 
 function openDeleteAccount() {
+  const inp = $('del-confirm-input');
+  if (inp) inp.value = '';
+  const btn = $('btn-del-confirm');
+  if (btn) btn.disabled = true;
   $('del-modal-mask').classList.add('show');
 }
 function closeDeleteAccount() {
   $('del-modal-mask').classList.remove('show');
 }
-window.openDeleteAccount = openDeleteAccount;
+function checkDelConfirm(inp) {
+  const btn = $('btn-del-confirm');
+  if (btn) btn.disabled = inp.value !== '탈퇴합니다';
+}
+window.openDeleteAccount  = openDeleteAccount;
 window.closeDeleteAccount = closeDeleteAccount;
+window.checkDelConfirm    = checkDelConfirm;
+
+// ── Account Info screen ────────────────────────────────────
+async function openAccountInfo() {
+  if (!gUser) return;
+  $('ai-username').textContent = gUser.username || '—';
+  $('ai-email').textContent    = gUser.email    || '미등록';
+  $('ai-joined').textContent   = gUser.created_at || '—';
+  try {
+    const r = await authFetch(`${API}/api/auth/stats`);
+    if (r.ok) {
+      const s = await r.json();
+      $('ai-lectures').textContent = s.lecture_count ?? '—';
+      $('ai-notes').textContent    = s.note_count ?? '—';
+    }
+  } catch {}
+  $('account-info-screen').classList.add('active');
+}
+function closeAccountInfo() { $('account-info-screen').classList.remove('active'); }
+window.openAccountInfo  = openAccountInfo;
+window.closeAccountInfo = closeAccountInfo;
+
+// ── Plan screen ────────────────────────────────────────────
+function openPlanScreen() {
+  const cur = gUser?.plan || 'free';
+  ['free','pro','team'].forEach(p => {
+    const card = $(`plan-${p}`);
+    if (card) card.classList.toggle('selected', p === cur);
+  });
+  $('plan-screen').classList.add('active');
+}
+function closePlanScreen() { $('plan-screen').classList.remove('active'); }
+function selectPlan(plan) {
+  ['free','pro','team'].forEach(p => { const c = $(`plan-${p}`); if (c) c.classList.toggle('selected', p === plan); });
+  if (plan === 'free') { showToast('현재 플랜입니다.', 'info'); return; }
+  showToast(`${plan.toUpperCase()} 플랜 결제 기능은 준비 중입니다.`, 'info');
+}
+window.openPlanScreen  = openPlanScreen;
+window.closePlanScreen = closePlanScreen;
+window.selectPlan      = selectPlan;
+
+// ── Language screen ────────────────────────────────────────
+const LANG_NAMES = { ko: '한국어', en: 'English', ja: '日本語', zh: '中文(简体)' };
+function openLanguageScreen() {
+  const cur = gUser?.locale || 'ko';
+  ['ko','en','ja','zh'].forEach(l => {
+    const el = $(`lang-${l}`);
+    if (!el) return;
+    el.classList.toggle('active', l === cur);
+    const check = el.querySelector('.lang-check');
+    if (check) check.style.display = l === cur ? '' : 'none';
+  });
+  $('language-screen').classList.add('active');
+}
+function closeLanguageScreen() { $('language-screen').classList.remove('active'); }
+async function setLanguage(locale) {
+  ['ko','en','ja','zh'].forEach(l => {
+    const el = $(`lang-${l}`);
+    if (!el) return;
+    el.classList.toggle('active', l === locale);
+    const check = el.querySelector('.lang-check');
+    if (check) check.style.display = l === locale ? '' : 'none';
+  });
+  try {
+    const r = await authFetch(`${API}/api/auth/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locale }),
+    });
+    if (r.ok) {
+      gUser = await r.json();
+      renderProfileHeader();
+      showToast(`언어가 ${LANG_NAMES[locale]}로 설정되었습니다.`, 'ok');
+    }
+  } catch { showToast('설정 저장에 실패했습니다.', 'err'); }
+}
+window.openLanguageScreen  = openLanguageScreen;
+window.closeLanguageScreen = closeLanguageScreen;
+window.setLanguage = setLanguage;
 
 async function doDeleteAccount() {
   try {
@@ -491,10 +709,13 @@ function showTab(id, viaBack) {
 window.showTab = showTab;
 
 function handleBackButton() {
-  // Profile screens
-  if ($('change-pw-screen').classList.contains('active')) { closeChangePw(); return; }
+  // Profile sub-screens (deeper → shallower)
+  if ($('language-screen')?.classList.contains('active'))    { closeLanguageScreen(); return; }
+  if ($('plan-screen')?.classList.contains('active'))        { closePlanScreen(); return; }
+  if ($('account-info-screen')?.classList.contains('active')){ closeAccountInfo(); return; }
+  if ($('change-pw-screen').classList.contains('active'))    { closeChangePw(); return; }
   if ($('edit-profile-screen').classList.contains('active')) { closeEditProfile(); return; }
-  if ($('profile-screen').classList.contains('active')) { closeProfile(); return; }
+  if ($('profile-screen').classList.contains('active'))      { closeProfile(); return; }
   // Note edit
   if (currentTab === 'th' && $('th-note-edit').style.display === 'block') { cancelEditNote(); return; }
   // Auth screens
@@ -523,6 +744,58 @@ function showToast(msg, type = 'info') {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = type; }, 3000);
 }
+
+// ── Gen banner (background note generation) ───────────────
+let genBannerElapsed = 0;
+let genBannerTimer   = null;
+let genBannerNoteText = '';
+let genBannerOutputId = null;
+
+function showGenBanner(title, sub) {
+  genBannerElapsed = 0;
+  clearInterval(genBannerTimer);
+  genBannerNoteText = '';
+  genBannerOutputId = null;
+  $('gen-banner-title').textContent = title;
+  $('gen-banner-sub').textContent   = sub;
+  $('gen-banner-time').textContent  = '0초';
+  $('gen-banner-btn').style.display = 'none';
+  const b = $('gen-banner');
+  b.className = 'gen-banner';
+  b.style.display = 'flex';
+  genBannerTimer = setInterval(() => {
+    genBannerElapsed++;
+    const el = $('gen-banner-time');
+    if (el) el.textContent = genBannerElapsed + '초';
+  }, 1000);
+}
+
+function updateGenBanner(title, sub) {
+  $('gen-banner-title').textContent = title;
+  $('gen-banner-sub').textContent   = sub || '';
+}
+
+function completeGenBanner() {
+  clearInterval(genBannerTimer);
+  updateGenBanner('노트 생성 완료', `${genBannerElapsed}초 · ${genBannerNoteText.length.toLocaleString()}자`);
+  $('gen-banner').classList.add('done');
+  $('gen-banner-btn').style.display = 'inline-flex';
+}
+
+function errorGenBanner(msg) {
+  clearInterval(genBannerTimer);
+  updateGenBanner('생성 실패', msg || '오류가 발생했습니다.');
+  $('gen-banner').classList.add('error');
+}
+
+function jumpToNoteResult() {
+  showTab('tn');
+  const res = $('res-tn');
+  if (res && res.classList.contains('show')) {
+    setTimeout(() => res.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+  }
+}
+window.jumpToNoteResult = jumpToNoteResult;
 
 // ── Pipeline A loading overlay ─────────────────────────────
 const PIPELINE_NOTE_AUDIO = [
@@ -755,13 +1028,11 @@ async function doGenNote() {
   else if (audioFile) { fd.append('audio_file', audioFile); hasAudio = true; }
   if (noteText) fd.append('note_text', noteText);
 
-  const pipeline = hasAudio ? PIPELINE_NOTE_AUDIO : PIPELINE_NOTE_NOAUDIO;
-  showLoad(hasAudio ? '음성 처리 중' : '자료 처리 중',
-           hasAudio ? '음성을 텍스트로 변환하고 있습니다.' : '업로드된 자료를 정리하고 있습니다.',
-           pipeline);
-  setTimeout(() => advanceStep('ingest'), 600);
-  if (hasAudio) setTimeout(() => advanceStep('stt'), 2200);
-
+  // Start banner (non-blocking — user can navigate tabs during generation)
+  showGenBanner(
+    hasAudio ? '음성 처리 중' : '자료 처리 중',
+    hasAudio ? '음성을 텍스트로 변환하고 있습니다.' : '업로드된 자료를 정리하고 있습니다.'
+  );
   $('btn-gen').disabled = true;
 
   const res    = $('res-tn');
@@ -781,9 +1052,7 @@ async function doGenNote() {
       const e = await r.json().catch(() => ({}));
       throw new Error(e.detail || `오류 ${r.status}`);
     }
-    if (hasAudio) advanceStep('stt');
-    advanceStep('agg');
-    advanceStep('ctx');
+    updateGenBanner('자료 통합 중', 'STT + PDF + 필기 병합 중...');
 
     const reader  = r.body.getReader();
     const decoder = new TextDecoder();
@@ -803,18 +1072,21 @@ async function doGenNote() {
         if (d.t === 'c') {
           if (firstChunk) {
             firstChunk = false;
-            advanceStep('gen');
-            hideLoad();
+            updateGenBanner('노트 생성 중 (LLM)', 'Gemini가 노트를 작성하는 중...');
             res.classList.add('show');
             streamAutoScroll = true;
-            setTimeout(() => res.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+            if (currentTab === 'tn') {
+              setTimeout(() => res.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+            }
           }
           noteText2 += d.v;
+          genBannerNoteText = noteText2;
           viewEl.style.whiteSpace = 'pre-wrap';
           viewEl.textContent = noteText2;
-          streamScrollToBottom();
+          if (currentTab === 'tn') streamScrollToBottom();
         } else if (d.t === 'd') {
           gOutputId = d.id;
+          genBannerOutputId = d.id;
           viewEl.style.whiteSpace = '';
           renderMd(viewEl, noteText2);
           $('meta-tn').innerHTML = `강의 ID: ${d.lid}  ·  노트 ID: ${d.id}  ·  ${noteText2.length.toLocaleString()}자`;
@@ -823,6 +1095,7 @@ async function doGenNote() {
           ['btn-dl-tn','btn-pdf-tn','btn-goto-th'].forEach(id => $(id).style.display = 'inline-flex');
           viewEl.dataset.raw   = noteText2;
           viewEl.dataset.title = `${week}주차 노트`;
+          completeGenBanner();
           showToast('노트 생성이 완료되었습니다', 'ok');
         } else if (d.t === 'err') {
           throw new Error(d.msg || '서버 오류');
@@ -830,11 +1103,10 @@ async function doGenNote() {
       }
     }
   } catch (e) {
-    hideLoad();
+    errorGenBanner(e.message || '요청 중 오류가 발생했습니다.');
     showErr('err-tn', e.message || '요청 중 오류가 발생했습니다.');
     showToast('노트 생성 중 오류가 발생했습니다.', 'err');
   } finally {
-    hideLoad();
     $('btn-gen').disabled = false;
   }
 }

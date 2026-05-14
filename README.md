@@ -87,20 +87,22 @@ Step 0 분석 결과(주차별 커리큘럼, 핵심 용어 사전, 교수법 방
 
 ## 6. 운영 제약 및 현재 상태
 
-### API 엔드포인트 (17개)
+### API 엔드포인트 (19개)
 
 **Auth**
 
 | 메서드 | 경로 | 기능 |
 |---|---|---|
-| POST | `/api/auth/register` | 회원가입 (username, password, display_name, school, major) |
+| POST | `/api/auth/register` | 회원가입 (username, password, email, display_name, school, major) |
 | POST | `/api/auth/login` | 로그인 → Bearer 토큰 반환 |
 | POST | `/api/auth/logout` | 세션 토큰 무효화 |
 | GET | `/api/auth/me` | 현재 사용자 정보 조회 |
 | PATCH | `/api/auth/me` | 프로필 수정 (display_name, school, major, locale) |
 | PATCH | `/api/auth/password` | 비밀번호 변경 (기존 세션 전체 무효화) |
 | DELETE | `/api/auth/me` | 계정 및 모든 데이터 삭제 |
-| GET | `/api/auth/stats` | 사용자 강의·노트 통계 |
+| GET | `/api/auth/stats` | 사용자 강의·노트 통계 (이번 주 포함) |
+| POST | `/api/auth/find-id` | 아이디 찾기 (이름·학교로 조회) |
+| POST | `/api/auth/find-pw` | 비밀번호 찾기 (등록 이메일로 안내) |
 
 **Core Pipeline (사용자 인증 필수)**
 
@@ -120,10 +122,11 @@ Step 0 분석 결과(주차별 커리큘럼, 핵심 용어 사전, 교수법 방
 
 - API 엔드포인트 일부 예외 처리 미적용 — Gemini quota 초과, 업로드 실패 시 비구조적 오류 반환
 - SQLite 경로 미분리 — 컨테이너 재배포 시 데이터 소실 위험
-- `requirements.txt` 미생성
 - 비밀번호 SHA256 단방향 해시 (salt 포함) — alpha/beta 수준, bcrypt 전환 미적용
+- Render 무료 플랜: 15분 비활성 시 슬립 → 최초 요청 약 30초 콜드 스타트
+- 비밀번호 찾기: 실제 이메일 발송 미구현 (데모 메시지만 반환)
 
-→ 배포 전 해결 필요. 상세 체크리스트는 [plan.md](plan.md) 참조.
+→ 상세 체크리스트는 [plan.md](plan.md) 참조.
 
 ---
 
@@ -140,6 +143,11 @@ Step 0 분석 결과(주차별 커리큘럼, 핵심 용어 사전, 교수법 방
 | ✅ 스트리밍 자동 스크롤 | 생성 중 하단 자동 스크롤 + 수동 조작 시 멈춤 | 완료 |
 | ✅ 로그인·사용자 인증 | 온보딩·로그인·회원가입 화면, 세션 토큰, 사용자별 데이터 격리 | 완료 |
 | ✅ 프로필 화면 | Profile B — 그라디언트 헤더, 통계, 프로필 편집, 비밀번호 변경, 계정 삭제 | 완료 |
+| ✅ 백그라운드 노트 생성 | Gen-banner — 처리 중 다른 탭 자유 탐색, 완료 시 "보기 →" | 완료 |
+| ✅ 아이디/비밀번호 찾기 | 이름·학교로 아이디 찾기, 등록 이메일로 비밀번호 안내 | 완료 |
+| ✅ 구독 플랜·언어·가입 정보 화면 | 프로필 확장 — 플랜 비교, 언어 설정, 계정 상세 조회 | 완료 |
+| ✅ 회원가입 강화 | 이메일 필드, 비밀번호 강도 게이지, 이용약관 동의 | 완료 |
+| ✅ Render 배포 | `render.yaml` + GitHub 자동 배포 | 완료 |
 | PWA 매니페스트 | `manifest.json` 추가 → 모바일 홈 화면 설치 가능 | 대기 |
 | 처리 메타데이터 표시 | 노트 완료 후 소스 구성·처리 시간 표시 | 대기 |
 | 이미지 입력 지원 | Gemini Vision 기반 칠판 사진·필기 이미지 처리 | 대기 |
@@ -149,7 +157,7 @@ Step 0 분석 결과(주차별 커리큘럼, 핵심 용어 사전, 교수법 방
 
 학기 내 완성된 앱을 외부 접근 가능한 상태로 배포하고, 포트폴리오 아카이브로 정리한다.
 
-- Railway 배포 (상세 체크리스트: [plan.md](plan.md))
+- Render 배포 완료: `https://lecture-note-2cb6.onrender.com` (상세: [plan.md](plan.md))
 - GitHub README 정비 및 아키텍처 다이어그램 추가
 - 슬라이드 기능 카드 명칭 파이프라인 용어로 교체
 

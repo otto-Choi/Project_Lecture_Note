@@ -157,14 +157,23 @@
           <div class="auth-field-hint" id="reg-username-hint"></div>
         </div>
         <div class="auth-field">
+          <label for="reg-email">이메일 <span style="font-weight:400;color:var(--muted)">(선택)</span></label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-mail"/></svg>
+            <input type="email" id="reg-email" placeholder="비밀번호 찾기 등에 사용" autocomplete="email">
+          </div>
+        </div>
+        <div class="auth-field">
           <label for="reg-password">비밀번호 *</label>
           <div class="auth-input-wrap">
             <svg class="field-icon"><use href="#i-lock"/></svg>
-            <input type="password" id="reg-password" placeholder="4자 이상" autocomplete="new-password">
+            <input type="password" id="reg-password" placeholder="4자 이상" autocomplete="new-password" oninput="updatePwStrength('reg-password','reg-pw-strength')">
             <button class="btn-eye" type="button" onclick="togglePw('reg-password',this)">
               <svg><use href="#i-eye"/></svg>
             </button>
           </div>
+          <div class="pw-strength" id="reg-pw-strength"><div class="pw-strength-bar"></div></div>
+          <div class="pw-strength-label" id="reg-pw-strength-label"></div>
         </div>
         <div class="auth-field">
           <label for="reg-password2">비밀번호 확인 *</label>
@@ -200,11 +209,85 @@
             <input type="text" id="reg-major" placeholder="예) 경영학과">
           </div>
         </div>
-        <button class="btn btn-primary" id="btn-signup-submit" onclick="doRegister()">가입 완료</button>
+        <div class="terms-block">
+          <label class="terms-row terms-all">
+            <input type="checkbox" id="terms-all" onchange="toggleAllTerms(this)">
+            <span class="terms-check-box"></span>
+            <span class="terms-all-label">전체 동의</span>
+          </label>
+          <div class="terms-divider"></div>
+          <label class="terms-row">
+            <input type="checkbox" id="terms-use" class="terms-required" onchange="checkTermsReq()">
+            <span class="terms-check-box"></span>
+            <span>[필수] 이용약관 동의</span>
+          </label>
+          <label class="terms-row">
+            <input type="checkbox" id="terms-privacy" class="terms-required" onchange="checkTermsReq()">
+            <span class="terms-check-box"></span>
+            <span>[필수] 개인정보 처리방침 동의</span>
+          </label>
+          <label class="terms-row">
+            <input type="checkbox" id="terms-mkt">
+            <span class="terms-check-box"></span>
+            <span>[선택] 마케팅 수신 동의</span>
+          </label>
+        </div>
+        <button class="btn btn-primary" id="btn-signup-submit" onclick="doRegister()" disabled>가입하고 시작하기</button>
       </div>
 
       <div class="auth-switch" style="margin-top:14px">
         이미 계정이 있으신가요? <a onclick="showAuthScreen('login')">로그인</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Find Account screen -->
+  <div class="login-screen" id="screen-find" style="display:none">
+    <div class="login-header">
+      <button class="login-back" onclick="showAuthScreen('login')" aria-label="뒤로">
+        <svg><use href="#i-back"/></svg>
+      </button>
+      <div class="login-header-text">
+        <div class="login-header-title">계정 찾기</div>
+        <div class="login-header-sub">아이디 또는 비밀번호 찾기</div>
+      </div>
+    </div>
+    <div class="login-card">
+      <div class="find-tabs">
+        <button class="find-tab active" id="find-tab-id" onclick="switchFindTab('id')">아이디 찾기</button>
+        <button class="find-tab" id="find-tab-pw" onclick="switchFindTab('pw')">비밀번호 찾기</button>
+      </div>
+      <div id="find-id-form">
+        <div class="auth-err-banner ok" id="find-id-result" style="margin-bottom:10px"></div>
+        <div class="auth-field">
+          <label for="find-name">이름 / 닉네임</label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-user"/></svg>
+            <input type="text" id="find-name" placeholder="가입 시 입력한 이름">
+          </div>
+        </div>
+        <div class="auth-field">
+          <label for="find-school">학교</label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-school"/></svg>
+            <input type="text" id="find-school" placeholder="가입 시 입력한 학교명">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="doFindId()">아이디 찾기</button>
+      </div>
+      <div id="find-pw-form" style="display:none">
+        <div class="auth-err-banner ok" id="find-pw-result" style="margin-bottom:10px"></div>
+        <div class="auth-field">
+          <label for="find-pw-username">아이디</label>
+          <div class="auth-input-wrap">
+            <svg class="field-icon"><use href="#i-user"/></svg>
+            <input type="text" id="find-pw-username" placeholder="가입한 아이디">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="doFindPw()">임시 비밀번호 받기</button>
+      </div>
+      <div class="auth-switch" style="margin-top:14px">
+        <a onclick="showAuthScreen('login')">← 로그인으로 돌아가기</a>
       </div>
     </div>
   </div>
@@ -240,6 +323,10 @@
         <div class="profile-stat-num" id="profile-stat-notes">—</div>
         <div class="profile-stat-label">노트</div>
       </div>
+      <div class="profile-stat">
+        <div class="profile-stat-num" id="profile-stat-week">—</div>
+        <div class="profile-stat-label">이번 주</div>
+      </div>
     </div>
   </div>
 
@@ -265,6 +352,22 @@
         </div>
         <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
       </div>
+      <div class="profile-row" onclick="openAccountInfo()">
+        <div class="profile-row-icon"><svg><use href="#i-info"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">가입 정보</div>
+          <div class="profile-row-value">계정 · 이용 내역 확인</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+      <div class="profile-row" onclick="openPlanScreen()">
+        <div class="profile-row-icon"><svg><use href="#i-crown"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">구독 플랜</div>
+          <div class="profile-row-value" id="profile-row-plan">Free</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
     </div>
 
     <!-- 설정 섹션 -->
@@ -275,6 +378,14 @@
         <div class="profile-row-body">
           <div class="profile-row-label">다크모드</div>
           <div class="profile-row-value" id="profile-dark-value">현재: 라이트</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+      <div class="profile-row" onclick="openLanguageScreen()">
+        <div class="profile-row-icon"><svg><use href="#i-globe"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">언어 설정</div>
+          <div class="profile-row-value" id="profile-row-lang">한국어</div>
         </div>
         <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
       </div>
@@ -363,9 +474,17 @@
         <label for="cp-new">새 비밀번호</label>
         <div class="auth-input-wrap">
           <svg class="field-icon"><use href="#i-lock"/></svg>
-          <input type="password" id="cp-new" placeholder="새 비밀번호 (4자 이상)">
+          <input type="password" id="cp-new" placeholder="새 비밀번호 (4자 이상)" oninput="updatePwStrength('cp-new','cp-pw-strength')">
           <button class="btn-eye" type="button" onclick="togglePw('cp-new',this)"><svg><use href="#i-eye"/></svg></button>
         </div>
+        <div class="pw-strength" id="cp-pw-strength"><div class="pw-strength-bar"></div></div>
+        <div class="pw-strength-label" id="cp-pw-strength-label"></div>
+        <ul class="pw-rules" id="cp-pw-rules">
+          <li id="pr-len">8자 이상</li>
+          <li id="pr-eng">영문 포함</li>
+          <li id="pr-num">숫자 포함</li>
+          <li id="pr-sym">특수문자 포함</li>
+        </ul>
       </div>
       <div class="auth-field">
         <label for="cp-new2">새 비밀번호 확인</label>
@@ -380,17 +499,134 @@
   </div>
 </div>
 
+<!-- Account Info sub-screen -->
+<div class="profile-screen" id="account-info-screen">
+  <div class="profile-header" style="padding-bottom:20px">
+    <button class="profile-back" onclick="closeAccountInfo()"><svg><use href="#i-back"/></svg></button>
+    <div class="profile-avatar-wrap" style="gap:6px;padding-top:8px">
+      <div style="font-size:1.05rem;font-weight:800;color:#fff">가입 정보</div>
+    </div>
+  </div>
+  <div class="profile-body">
+    <div class="profile-section">
+      <div class="profile-section-title">계정</div>
+      <div class="account-info-row"><span class="account-info-label">아이디</span><span class="account-info-val" id="ai-username">—</span></div>
+      <div class="account-info-row"><span class="account-info-label">이메일</span><span class="account-info-val" id="ai-email">미등록</span></div>
+      <div class="account-info-row"><span class="account-info-label">가입일</span><span class="account-info-val" id="ai-joined">—</span></div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">이용 내역</div>
+      <div class="account-info-row"><span class="account-info-label">등록 강의</span><span class="account-info-val" id="ai-lectures">—</span></div>
+      <div class="account-info-row"><span class="account-info-label">생성 노트</span><span class="account-info-val" id="ai-notes">—</span></div>
+    </div>
+    <div class="profile-section danger-section">
+      <div class="profile-section-title" style="color:var(--danger)">위험 영역</div>
+      <div class="profile-row danger" onclick="openDeleteAccount()">
+        <div class="profile-row-icon danger"><svg><use href="#i-user-del"/></svg></div>
+        <div class="profile-row-body">
+          <div class="profile-row-label">회원 탈퇴</div>
+          <div class="profile-row-value">모든 데이터가 영구 삭제됩니다</div>
+        </div>
+        <div class="profile-row-arrow"><svg><use href="#i-chevron"/></svg></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Plan sub-screen -->
+<div class="profile-screen" id="plan-screen">
+  <div class="profile-header" style="padding-bottom:20px">
+    <button class="profile-back" onclick="closePlanScreen()"><svg><use href="#i-back"/></svg></button>
+    <div class="profile-avatar-wrap" style="gap:6px;padding-top:8px">
+      <div style="font-size:1.05rem;font-weight:800;color:#fff">구독 플랜</div>
+      <div style="font-size:0.8rem;color:rgba(255,255,255,0.75)">첫 7일 무료 체험</div>
+    </div>
+  </div>
+  <div class="profile-body">
+    <div class="plan-cards">
+      <div class="plan-card" id="plan-free" onclick="selectPlan('free')">
+        <div class="plan-card-name">Free</div>
+        <div class="plan-card-price">₩0<span>/월</span></div>
+        <ul class="plan-card-features">
+          <li>월 10회 노트 생성</li>
+          <li>강의 등록 3개</li>
+          <li>기본 STT 품질</li>
+        </ul>
+        <div class="plan-card-cta">현재 플랜</div>
+      </div>
+      <div class="plan-card popular" id="plan-pro" onclick="selectPlan('pro')">
+        <div class="plan-badge-popular">인기</div>
+        <div class="plan-card-name">Pro</div>
+        <div class="plan-card-price">₩9,900<span>/월</span></div>
+        <ul class="plan-card-features">
+          <li>무제한 노트 생성</li>
+          <li>강의 등록 무제한</li>
+          <li>고품질 STT</li>
+          <li>우선 처리</li>
+        </ul>
+        <div class="plan-card-cta btn btn-primary">업그레이드</div>
+      </div>
+      <div class="plan-card" id="plan-team" onclick="selectPlan('team')">
+        <div class="plan-card-name">Team</div>
+        <div class="plan-card-price">₩29,900<span>/월</span></div>
+        <ul class="plan-card-features">
+          <li>Pro 기능 전체</li>
+          <li>팀원 5명</li>
+          <li>노트 공유</li>
+          <li>관리자 대시보드</li>
+        </ul>
+        <div class="plan-card-cta btn btn-primary">업그레이드</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Language sub-screen -->
+<div class="profile-screen" id="language-screen">
+  <div class="profile-header" style="padding-bottom:20px">
+    <button class="profile-back" onclick="closeLanguageScreen()"><svg><use href="#i-back"/></svg></button>
+    <div class="profile-avatar-wrap" style="gap:6px;padding-top:8px">
+      <div style="font-size:1.05rem;font-weight:800;color:#fff">언어 설정</div>
+    </div>
+  </div>
+  <div class="profile-body">
+    <div class="profile-section">
+      <div class="lang-option active" id="lang-ko" onclick="setLanguage('ko')">
+        <span class="lang-flag">🇰🇷</span>
+        <div class="lang-info"><div class="lang-name">한국어</div><div class="lang-sub">Korean</div></div>
+        <svg class="lang-check"><use href="#i-check"/></svg>
+      </div>
+      <div class="lang-option" id="lang-en" onclick="setLanguage('en')">
+        <span class="lang-flag">🇺🇸</span>
+        <div class="lang-info"><div class="lang-name">English</div><div class="lang-sub">영어</div></div>
+        <svg class="lang-check" style="display:none"><use href="#i-check"/></svg>
+      </div>
+      <div class="lang-option" id="lang-ja" onclick="setLanguage('ja')">
+        <span class="lang-flag">🇯🇵</span>
+        <div class="lang-info"><div class="lang-name">日本語</div><div class="lang-sub">일본어</div></div>
+        <svg class="lang-check" style="display:none"><use href="#i-check"/></svg>
+      </div>
+      <div class="lang-option" id="lang-zh" onclick="setLanguage('zh')">
+        <span class="lang-flag">🇨🇳</span>
+        <div class="lang-info"><div class="lang-name">中文(简体)</div><div class="lang-sub">중국어 간체</div></div>
+        <svg class="lang-check" style="display:none"><use href="#i-check"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Delete account modal -->
 <div class="del-modal-mask" id="del-modal-mask">
   <div class="del-modal">
     <div class="del-modal-title">계정을 삭제하시겠어요?</div>
     <div class="del-modal-desc">
       강의, 노트 등 모든 데이터가 영구 삭제됩니다.<br>
-      이 작업은 되돌릴 수 없습니다.
+      확인을 위해 아래에 <strong>탈퇴합니다</strong>를 입력하세요.
     </div>
+    <input type="text" id="del-confirm-input" class="del-confirm-input" placeholder="탈퇴합니다" oninput="checkDelConfirm(this)">
     <div class="del-modal-actions">
       <button class="btn-ghost" onclick="closeDeleteAccount()">취소</button>
-      <button class="btn-danger" onclick="doDeleteAccount()">계정 삭제</button>
+      <button class="btn-danger" id="btn-del-confirm" onclick="doDeleteAccount()" disabled>계정 삭제</button>
     </div>
   </div>
 </div>
@@ -424,6 +660,17 @@
       <svg id="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
     </button>
   </header>
+
+  <!-- ─── Gen banner (background processing) ── -->
+  <div id="gen-banner" class="gen-banner" style="display:none">
+    <div class="gen-banner-dot"></div>
+    <div class="gen-banner-body">
+      <div class="gen-banner-title" id="gen-banner-title">노트 생성 중</div>
+      <div class="gen-banner-sub" id="gen-banner-sub">처리를 시작합니다...</div>
+    </div>
+    <span class="gen-banner-time" id="gen-banner-time">0초</span>
+    <button class="gen-banner-btn" id="gen-banner-btn" onclick="jumpToNoteResult()" style="display:none">보기 →</button>
+  </div>
 
   <!-- ─── Content ────────────────────────────── -->
   <main class="content" id="content">
