@@ -1,0 +1,47 @@
+<!--
+  AndroidManifest.xml — 적용 가이드
+
+  `npx cap add android` 실행 후, android/app/src/main/AndroidManifest.xml 파일이 생성됩니다.
+  아래 항목들을 그 파일에 병합하세요. (이미 있는 줄은 중복 추가하지 마세요.)
+
+  주의: 아래 파일은 패치용 스니펫이며, 그대로 복사해서 덮어쓰는 용도가 아닙니다.
+        실제 AndroidManifest.xml 의 <manifest>, <application> 태그 안에 해당 부분만 추가하세요.
+-->
+
+<!-- ============================================================
+  1. <manifest> 최상단(자식 첫 줄)에 권한 추가
+============================================================ -->
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.RECORD_AUDIO"/>
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="32"/>
+<!-- API 33+ 에서는 미디어 별 권한 사용 -->
+<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+<uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+<!-- 파일 시스템 쓰기 (Documents/ 에 PDF 저장용; Android 10+ 에서는 scoped storage 적용) -->
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+    android:maxSdkVersion="29"/>
+
+<!-- 마이크가 없는 기기에서도 설치 가능하도록 (선택) -->
+<uses-feature android:name="android.hardware.microphone" android:required="false"/>
+
+
+<!-- ============================================================
+  2. <application> 태그 속성 수정/추가
+     기존:  <application ... >
+     수정:  네트워크 보안 설정 + 백업 허용 + 라벨 적용
+============================================================ -->
+<!--  android:networkSecurityConfig="@xml/network_security_config"  -->
+<!--  android:usesCleartextTraffic="false"                          -->
+<!--  android:allowBackup="true"                                    -->
+<!--  android:label="@string/app_name"                              -->
+<!--  android:icon="@mipmap/ic_launcher"                            -->
+<!--  android:roundIcon="@mipmap/ic_launcher_round"                 -->
+
+
+<!-- ============================================================
+  3. MainActivity 안에 (또는 application 안에)
+     테마: SplashTheme 사용 (Capacitor 가 기본 생성)
+============================================================ -->
+<!-- 그대로 두면 됩니다. capacitor.config.ts 의 SplashScreen 옵션이 자동 적용됩니다. -->

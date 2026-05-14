@@ -1,0 +1,265 @@
+from fastapi import FastAPI, Form, UploadFile, File, Depends, HTTPException
+from fastapi.responses import Response, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from typing import Optional
+import json
+import markdown
+
+import models
+from database import engine, get_db, SessionLocal
+from services import pdf_parser, stt_service, aggregator, llm_service
+
+# 앱 시작 시 lecture.db에 테이블 자동 생성
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="LectureNote API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/lectures")
+def list_lectures(db: Session = Depends(get_db)):
+    """등록된 강의 목록을 반환한다."""
+    lectures = db.query(models.Lecture).order_by(models.Lecture.id.desc()).all()
+    return [
+        {"id": l.id, "title": l.title, "subject": l.subject,
+         "created_at": l.created_at.strftime("%Y-%m-%d") if l.created_at else ""}
+        for l in lectures
+    ]
+
+
+@app.delete("/api/lectures/{lecture_id}")
+def delete_lecture(lecture_id: int, db: Session = Depends(get_db)):
+    """강의를 삭제한다. 연결된 소스·노트도 cascade 삭제된다."""
+    lecture = db.query(models.Lecture).filter(models.Lecture.id == lecture_id).first()
+    if not lecture:
+        raise HTTPException(status_code=404, detail="강의를 찾을 수 없습니다.")
+    db.delete(lecture)
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/create-step0")
+async def create_step0(
+    syllabus_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """강의계획서를 업로드하면 LLM이 Step 0 로드맵을 분석하고 과목명·교수명을 자동 추출한다."""
+
+    # 1. 업로드 파일에서 텍스트 추출
+    file_bytes = await syllabus_file.read()
+    content_type = syllabus_file.content_type or ""
+    filename = syllabus_file.filename or ""
+
+    if "pdf" in content_type or filename.lower().endswith(".pdf"):
+        syllabus_text = pdf_parser.extract_text_from_pdf(file_bytes)
+    else:
+        syllabus_text = file_bytes.decode("utf-8")
+
+    # 2. LLM으로 Step 0 분석 수행
+    step0_result = llm_service.analyze_syllabus(syllabus_text)
+
+    # 3. Step 0 결과에서 과목명·교수명 자동 추출
+    title, subject = llm_service.extract_lecture_meta(step0_result)
+
+    # 4. Lecture 레코드 저장
+    lecture = models.Lecture(title=title, subject=subject, step0_analysis=step0_result)
+    db.add(lecture)
+    db.commit()
+    db.refresh(lecture)
+
+    return {
+        "lecture_id": lecture.id,
+        "title": lecture.title,
+        "subject": lecture.subject,
+        "step0_analysis": lecture.step0_analysis,
+    }
+
+
+@app.post("/api/generate-note")
+async def generate_note(
+    lecture_id: int = Form(...),
+    week: Optional[int] = Form(None),
+    pdf_file: Optional[UploadFile] = File(None),
+    audio_file: Optional[UploadFile] = File(None),
+    note_text: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """Step 0가 저장된 강의에 대해 주차별 소스를 받아 통합 요약 노트를 SSE로 스트리밍한다."""
+
+    # 1. lecture_id로 Lecture 조회 → step0_analysis 확보
+    lecture = db.query(models.Lecture).filter(models.Lecture.id == lecture_id).first()
+    if not lecture:
+        raise HTTPException(status_code=404, detail=f"lecture_id {lecture_id}에 해당하는 강의가 없습니다.")
+
+    step0 = lecture.step0_analysis or ""
+
+    # 2. PDF 텍스트 추출
+    pdf_text = ""
+    if pdf_file:
+        pdf_bytes = await pdf_file.read()
+        pdf_text = pdf_parser.extract_text_from_pdf(pdf_bytes)
+
+    # 3. STT 텍스트 추출 (블로킹 - 스트리밍 시작 전에 완료)
+    stt_text = ""
+    if audio_file:
+        audio_bytes = await audio_file.read()
+        mime = audio_file.content_type or "audio/mp4"
+        stt_text = stt_service.process_audio_to_text(audio_bytes, mime_type=mime)
+
+    # 4. 4가지 소스를 단일 컨텍스트로 병합
+    aggregated = aggregator.aggregate_sources(
+        step0=step0,
+        pdf_text=pdf_text,
+        stt_text=stt_text,
+        note_text=note_text or "",
+    )
+
+    # 5. 원본 소스를 Source 테이블에 저장 (스트리밍 전에 커밋)
+    for source_type, content in [("PDF", pdf_text), ("STT", stt_text), ("NOTE", note_text or "")]:
+        if content:
+            db.add(models.Source(lecture_id=lecture_id, type=source_type, content=content))
+    db.commit()
+
+    # 6. LLM 스트리밍 → SSE 응답
+    def event_stream():
+        full_text = ""
+        try:
+            for chunk in llm_service.generate_lecture_note_stream(aggregated):
+                full_text += chunk
+                yield f"data: {json.dumps({'t': 'c', 'v': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'t': 'err', 'msg': str(e)})}\n\n"
+            return
+
+        # 스트리밍 완료 후 Output 저장
+        save_db = SessionLocal()
+        try:
+            output = models.Output(lecture_id=lecture_id, week=week, summary=full_text)
+            save_db.add(output)
+            save_db.commit()
+            save_db.refresh(output)
+            yield f"data: {json.dumps({'t': 'd', 'id': output.id, 'lid': lecture_id})}\n\n"
+        finally:
+            save_db.close()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/lectures/{lecture_id}/notes")
+def list_notes(lecture_id: int, db: Session = Depends(get_db)):
+    """특정 강의의 노트 목록을 반환한다."""
+    outputs = db.query(models.Output).filter(
+        models.Output.lecture_id == lecture_id
+    ).order_by(models.Output.id.asc()).all()
+    return [
+        {"id": o.id, "week": o.week,
+         "created_at": o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else ""}
+        for o in outputs
+    ]
+
+
+@app.get("/api/notes/{output_id}")
+def get_note(output_id: int, db: Session = Depends(get_db)):
+    """노트 내용을 JSON으로 반환한다."""
+    output = db.query(models.Output).filter(models.Output.id == output_id).first()
+    if not output:
+        raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+    return {
+        "id": output.id,
+        "lecture_id": output.lecture_id,
+        "note": output.summary,
+        "created_at": output.created_at.strftime("%Y-%m-%d %H:%M") if output.created_at else "",
+    }
+
+
+@app.delete("/api/notes/{output_id}")
+def delete_note(output_id: int, db: Session = Depends(get_db)):
+    """노트를 삭제한다."""
+    output = db.query(models.Output).filter(models.Output.id == output_id).first()
+    if not output:
+        raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+    db.delete(output)
+    db.commit()
+    return {"ok": True}
+
+
+class NoteUpdate(BaseModel):
+    summary: str
+
+
+@app.patch("/api/notes/{output_id}")
+def update_note(output_id: int, body: NoteUpdate, db: Session = Depends(get_db)):
+    """노트 내용을 수정한다."""
+    output = db.query(models.Output).filter(models.Output.id == output_id).first()
+    if not output:
+        raise HTTPException(status_code=404, detail="노트를 찾을 수 없습니다.")
+    output.summary = body.summary
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/download-note/{output_id}")
+def download_note(output_id: int, db: Session = Depends(get_db)):
+    """저장된 노트를 HTML 파일로 다운로드한다. 브라우저에서 열고 Ctrl+P로 PDF 저장 가능."""
+
+    output = db.query(models.Output).filter(models.Output.id == output_id).first()
+    if not output:
+        raise HTTPException(status_code=404, detail=f"output_id {output_id}에 해당하는 노트가 없습니다.")
+
+    html_body = markdown.markdown(
+        output.summary,
+        extensions=["tables", "fenced_code"],
+    )
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {{ font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+         max-width: 860px; margin: 0 auto; padding: 40px;
+         line-height: 1.6; color: #222; font-size: 15px; }}
+  h1 {{ font-size: 1.6em; margin: 1.2em 0 0.4em; color: #1a1a2e; }}
+  h2 {{ font-size: 1.35em; margin: 1em 0 0.3em; color: #1a1a2e; }}
+  h3 {{ font-size: 1.15em; margin: 0.9em 0 0.3em; color: #1a1a2e;
+        border-bottom: 1px solid #e0e0e0; padding-bottom: 3px; }}
+  h4 {{ font-size: 1em; margin: 0.7em 0 0.2em; }}
+  p {{ margin: 0.4em 0; }}
+  ul, ol {{ margin: 0.3em 0; padding-left: 1.5em; }}
+  li {{ margin: 0.15em 0; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 0.8em 0; }}
+  th, td {{ border: 1px solid #ccc; padding: 5px 10px; text-align: left; }}
+  th {{ background: #f4f4f4; }}
+  code {{ background: #f5f5f5; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }}
+  pre {{ background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }}
+  @media print {{ body {{ padding: 20px; }} }}
+</style>
+</head>
+<body>{html_body}</body>
+</html>"""
+
+    return Response(
+        content=html.encode("utf-8"),
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=lecture_note_{output_id}.html"},
+    )
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+app.mount("/", StaticFiles(directory="public", html=True), name="static")

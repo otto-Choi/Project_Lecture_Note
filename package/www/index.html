@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1A2D5E">
+  <title>LectureNote</title>
+
+  <!-- Pretendard font (offline-friendly: cached after first launch) -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+
+  <!-- App stylesheet -->
+  <link rel="stylesheet" href="assets/styles.css">
+
+  <!-- Inline-load the SVG icon sprite so <use href="#..."> works in WebView -->
+  <script>
+    fetch('assets/icons.svg').then(r => r.text()).then(t => {
+      const wrap = document.createElement('div');
+      wrap.style.display = 'none';
+      wrap.innerHTML = t;
+      document.body.insertBefore(wrap, document.body.firstChild);
+    }).catch(() => {});
+  </script>
+
+  <!-- Markdown + PDF (loaded from CDN; for offline-only builds, vendor these locally) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+
+  <!-- Compiled-in default API base (overridden by capacitor.config or Settings sheet) -->
+  <script>window.__LN_API_BASE__ = 'https://lecturenote.up.railway.app';</script>
+</head>
+<body>
+
+<!-- Boot splash (in-app, shown briefly while Capacitor native splash dismisses) -->
+<div class="boot-splash" id="boot-splash">
+  <div class="boot-logo">
+    <svg viewBox="0 0 48 48">
+      <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+      <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+      <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+      <rect x="14.5" y="17.5" width="6.5" height="1.2" fill="#fff" opacity="0.65"/>
+      <rect x="14.5" y="20.5" width="5.5" height="1.2" fill="#fff" opacity="0.65"/>
+      <rect x="14.5" y="23.5" width="6" height="1.2" fill="#fff" opacity="0.65"/>
+      <rect x="27.5" y="17.5" width="6.5" height="1.2" fill="#1A2D5E"/>
+      <rect x="27.5" y="20.5" width="5.5" height="1.2" fill="#6E6E73"/>
+      <rect x="27.5" y="23.5" width="6" height="1.2" fill="#6E6E73"/>
+    </svg>
+  </div>
+  <div class="boot-word">Lecture<em>Note</em></div>
+  <div class="boot-tag">멀티모달 강의 노트 파이프라인</div>
+  <div class="boot-dots"><span></span><span></span><span></span></div>
+</div>
+
+<div id="app">
+
+  <!-- ─── App bar ────────────────────────────── -->
+  <header class="appbar">
+    <div class="appbar-logo">
+      <svg viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+        <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+        <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+        <rect x="14.5" y="17.5" width="6.5" height="1.2" fill="#fff" opacity="0.65"/>
+        <rect x="14.5" y="20.5" width="5.5" height="1.2" fill="#fff" opacity="0.65"/>
+        <rect x="27.5" y="17.5" width="6.5" height="1.2" fill="#1A2D5E"/>
+        <rect x="27.5" y="20.5" width="5.5" height="1.2" fill="#6E6E73"/>
+      </svg>
+    </div>
+    <div class="appbar-title">Lecture<em>Note</em></div>
+    <div class="appbar-page" id="appbar-page">강의 등록</div>
+    <button class="appbar-action" onclick="openSettings()" aria-label="설정">
+      <svg><use href="#i-settings"/></svg>
+    </button>
+  </header>
+
+  <!-- ─── Content ────────────────────────────── -->
+  <main class="content" id="content">
+
+    <!-- ══════════ TAB 1: 강의 등록 ══════════ -->
+    <section id="tab-t0">
+
+      <div class="card">
+        <div class="card-title">
+          강의 등록
+          <span class="badge badge-required">Step 0</span>
+          <span class="card-title-suffix">학기 초 1회</span>
+        </div>
+
+        <div class="form-group">
+          <label>강의계획서 (PDF 또는 TXT) *</label>
+          <div class="drop-zone" id="dz-syllabus">
+            <input type="file" id="f-syllabus" accept=".pdf,.txt">
+            <div class="drop-icon"><svg><use href="#i-doc"/></svg></div>
+            <div class="drop-text">파일을 선택하거나 끌어다 놓으세요</div>
+            <div class="drop-hint">PDF · TXT</div>
+          </div>
+          <div class="file-chosen" id="fn-syllabus"></div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-t0" onclick="doStep0()">
+          강의 등록하기
+          <svg><use href="#i-arrow-right"/></svg>
+        </button>
+        <div class="err-box" id="err-t0"></div>
+      </div>
+
+      <div class="card result-card" id="res-t0">
+        <div class="result-head">
+          <div class="result-title">
+            <span class="ok-badge"><svg><use href="#i-check"/></svg></span>
+            강의 등록 완료
+          </div>
+          <button class="btn-action alt" onclick="showTab('tn')">
+            <svg><use href="#i-edit"/></svg>노트 생성
+          </button>
+        </div>
+        <div class="meta-info" id="meta-t0"></div>
+        <div class="note-view" id="view-t0"></div>
+      </div>
+
+    </section><!-- /tab-t0 -->
+
+
+    <!-- ══════════ TAB 2: 노트 생성 ══════════ -->
+    <section id="tab-tn" style="display:none">
+
+      <div class="card">
+        <div class="card-title">강의 선택</div>
+        <div class="selected-banner" id="selected-banner">
+          <svg><use href="#i-check"/></svg>
+          선택됨: <strong id="selected-name"></strong>
+        </div>
+        <div class="lecture-list" id="lecture-list">
+          <div class="lecture-empty">불러오는 중...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">강의 녹음 <span class="badge badge-optional">선택</span></div>
+        <div class="rec-box">
+          <div class="rec-label">앱 내 녹음 (원클릭)</div>
+          <div class="rec-row">
+            <button class="btn btn-rec" id="btn-rec" onclick="startRec()">
+              <svg><use href="#i-mic-fill"/></svg>녹음 시작
+            </button>
+            <button class="btn btn-stop" id="btn-stop" onclick="stopRec()">
+              <svg><use href="#i-stop"/></svg>중지
+            </button>
+            <span class="rec-timer" id="rec-timer">00:00</span>
+            <span class="rec-status" id="rec-status"></span>
+          </div>
+          <div class="rec-result" id="rec-result"></div>
+        </div>
+
+        <div class="or-line">또는 파일 업로드</div>
+
+        <div class="drop-zone" id="dz-audio">
+          <input type="file" id="f-audio" accept="audio/*,.m4a,.mp3,.wav,.ogg,.webm">
+          <div class="drop-icon"><svg><use href="#i-mic"/></svg></div>
+          <div class="drop-text">녹음 파일 업로드</div>
+          <div class="drop-hint">m4a · mp3 · wav · webm</div>
+        </div>
+        <div class="file-chosen" id="fn-audio"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">수업 자료 <span class="badge badge-optional">선택</span></div>
+        <div class="drop-zone" id="dz-pdf">
+          <input type="file" id="f-pdf" accept=".pdf">
+          <div class="drop-icon"><svg><use href="#i-pdf"/></svg></div>
+          <div class="drop-text">수업자료 PDF 업로드</div>
+          <div class="drop-hint">강의 슬라이드 · 교재 PDF</div>
+        </div>
+        <div class="file-chosen" id="fn-pdf"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">개인 필기 <span class="badge badge-optional">선택</span></div>
+        <textarea id="tn-note" rows="4" placeholder="수업 중 직접 작성한 필기 내용을 입력하세요..."></textarea>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg style="width:18px;height:18px;color:var(--blue)"><use href="#i-week"/></svg>
+          주차 설정
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>몇 주차 수업인가요?</label>
+          <input type="number" id="tn-week" min="1" max="20" value="1" style="width:100px">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-gen" onclick="doGenNote()">
+        노트 생성하기
+        <svg><use href="#i-arrow-right"/></svg>
+      </button>
+      <div class="err-box" id="err-tn"></div>
+
+      <div class="card result-card" id="res-tn">
+        <div class="result-head">
+          <div class="result-title">
+            <span class="ok-badge" id="tn-ok-badge" style="display:none"><svg><use href="#i-check"/></svg></span>
+            <span id="tn-result-label">노트 생성 중...</span>
+          </div>
+          <div class="result-actions">
+            <button class="btn-action" id="btn-pdf-tn" style="display:none" onclick="exportCurrentNotePdf()">
+              <svg><use href="#i-pdf"/></svg>PDF
+            </button>
+            <button class="btn-action alt" id="btn-dl-tn" style="display:none" onclick="doDownload()">
+              <svg><use href="#i-download"/></svg>HTML
+            </button>
+            <button class="btn-action success" id="btn-goto-th" style="display:none" onclick="showTab('th')">
+              <svg><use href="#i-library"/></svg>조회
+            </button>
+          </div>
+        </div>
+        <div class="meta-info" id="meta-tn"></div>
+        <div class="note-view" id="view-tn"></div>
+      </div>
+
+    </section><!-- /tab-tn -->
+
+
+    <!-- ══════════ TAB 3: 노트 조회 ══════════ -->
+    <section id="tab-th" style="display:none">
+
+      <div class="card">
+        <div class="card-title">강의 선택</div>
+        <div class="lecture-list" id="th-lecture-list">
+          <div class="lecture-empty">불러오는 중...</div>
+        </div>
+      </div>
+
+      <div class="card" id="th-notes-card" style="display:none">
+        <div class="card-title" id="th-notes-title">노트 목록</div>
+        <div id="th-notes-list" class="lecture-list"></div>
+      </div>
+
+      <div class="card result-card" id="th-note-view-card">
+        <div class="result-head">
+          <div class="result-title" id="th-note-view-title">
+            <span class="ok-badge"><svg><use href="#i-check"/></svg></span>
+            노트 내용
+          </div>
+          <div class="result-actions">
+            <button class="btn-action muted" id="btn-edit-note" onclick="startEditNote()">
+              <svg><use href="#i-pen"/></svg>편집
+            </button>
+            <button class="btn-action" onclick="exportThNotePdf()">
+              <svg><use href="#i-pdf"/></svg>PDF
+            </button>
+            <button class="btn-action alt" onclick="doDownloadTh()">
+              <svg><use href="#i-download"/></svg>HTML
+            </button>
+          </div>
+        </div>
+        <div class="note-view" id="th-note-view"></div>
+        <div id="th-note-edit" style="display:none;margin-top:10px">
+          <textarea id="th-note-textarea" style="width:100%;min-height:360px;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:0.85rem;line-height:1.7;resize:vertical"></textarea>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-primary" style="flex:1" onclick="saveEditNote()">저장</button>
+            <button class="btn" style="background:#e5e7eb;color:var(--text);flex:1" onclick="cancelEditNote()">취소</button>
+          </div>
+        </div>
+      </div>
+
+    </section><!-- /tab-th -->
+
+  </main>
+
+  <!-- ─── Bottom navigation ──────────────────── -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-t0" onclick="showTab('t0')">
+      <svg><use href="#i-clipboard"/></svg>
+      <span class="nav-label">강의 등록</span>
+    </button>
+    <button class="nav-btn" id="nav-tn" onclick="showTab('tn')">
+      <svg><use href="#i-edit"/></svg>
+      <span class="nav-label">노트 생성</span>
+    </button>
+    <button class="nav-btn" id="nav-th" onclick="showTab('th')">
+      <svg><use href="#i-library"/></svg>
+      <span class="nav-label">노트 조회</span>
+    </button>
+  </nav>
+
+</div><!-- /#app -->
+
+<!-- ─── Loading overlay (pipeline) ─────────────── -->
+<div class="loading-mask" id="loading">
+  <div class="loading-box">
+    <div class="load-header">
+      <div class="load-logo">
+        <svg viewBox="0 0 48 48">
+          <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+          <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+          <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <div class="load-text" id="load-text">처리 중...</div>
+        <div class="load-sub" id="load-sub"></div>
+      </div>
+    </div>
+    <div class="load-steps" id="load-steps"></div>
+    <div class="load-timer" id="load-timer">경과 0초</div>
+  </div>
+</div>
+
+<!-- ─── Toast ──────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ─── Settings sheet ────────────────────────── -->
+<div class="sheet-mask" id="settings-sheet" onclick="if(event.target===this)closeSettings()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">설정</div>
+    <div class="sheet-sub">백엔드 API 서버 주소를 입력하세요. 시연 환경(Railway 도메인, ngrok 터널, 같은 Wi-Fi의 PC IP 등)에 맞게 변경할 수 있습니다.</div>
+    <div class="form-group">
+      <label>API Base URL</label>
+      <input type="text" id="settings-api" placeholder="https://lecturenote.up.railway.app" autocomplete="off" autocapitalize="none" spellcheck="false">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn" style="background:var(--border-soft);color:var(--text)" onclick="resetSettings()">기본값</button>
+      <button class="btn btn-primary" style="min-height:44px;padding:11px;font-size:0.86rem;box-shadow:none" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

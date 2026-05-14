@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  network_security_config.xml
+  Location: android/app/src/main/res/xml/network_security_config.xml
+
+  Railway / Render 같은 HTTPS 백엔드만 쓴다면 이 파일이 필요 없습니다.
+  ngrok / cloudflared 도 HTTPS 입니다.
+
+  같은 Wi-Fi 의 노트북 PC 백엔드(http://192.168.x.x:8000)에 접근해야 한다면
+  AndroidManifest.xml 에서 android:usesCleartextTraffic="true" 로 바꾸거나,
+  아래처럼 화이트리스트 방식으로 특정 도메인/IP 만 cleartext 허용하세요.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+
+    <!-- 시연용: 같은 Wi-Fi 의 노트북 IP -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.0.10</domain>   <!-- 본인 IP 로 교체 -->
+        <domain includeSubdomains="true">10.0.2.2</domain>         <!-- 에뮬레이터에서 호스트 PC -->
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+</network-security-config>
