@@ -9,8 +9,12 @@ const RENDER_API       = 'https://lecture-note-2cb6.onrender.com';
 function resolveApiBase() {
   const proto = location.protocol;
   const host  = location.hostname;
-  // APK / 로컬 파일: localStorage 우선 → 없으면 Railway 기본값
-  if (proto === 'file:' || proto === 'capacitor:') {
+  // Capacitor APK 감지: file://, capacitor://, 또는 androidScheme:'https' 시 https://localhost
+  const isCap = proto === 'file:' || proto === 'capacitor:' ||
+    (typeof window !== 'undefined' && window.Capacitor &&
+     typeof window.Capacitor.isNativePlatform === 'function' &&
+     window.Capacitor.isNativePlatform());
+  if (isCap) {
     return (localStorage.getItem('LN_API_BASE') || DEFAULT_PROD_API).replace(/\/+$/, '');
   }
   if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
@@ -876,6 +880,8 @@ window.openGenModal = openGenModal;
 function openSettings() {
   const inp = $('settings-api');
   if (inp) inp.value = API;
+  const cur = $('settings-current-server');
+  if (cur) cur.textContent = _serverLabel(API);
   const sheet = $('settings-sheet-mask');
   if (sheet) sheet.classList.add('show');
 }
@@ -889,12 +895,18 @@ function applySettings() {
   closeSettings();
   _updateServerLabel();
 }
+function _serverLabel(url) {
+  if (!url) return '로컬';
+  if (url.includes('railway')) return 'Railway';
+  if (url.includes('onrender')) return 'Render';
+  try { return new URL(url).hostname; } catch { return url; }
+}
 function _updateServerLabel() {
+  const label = _serverLabel(API);
   const el = $('profile-server-value');
-  if (!el) return;
-  if (API.includes('railway')) el.textContent = 'Railway';
-  else if (API.includes('onrender')) el.textContent = 'Render';
-  else el.textContent = new URL(API).hostname;
+  if (el) el.textContent = label;
+  const info = $('app-server-info');
+  if (info) info.textContent = label ? `서버: ${label}` : '';
 }
 function resetSettings() {
   window.LN.setAPI(DEFAULT_PROD_API);

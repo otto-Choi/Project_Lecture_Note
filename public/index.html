@@ -454,6 +454,12 @@
       </div>
     </div>
 
+    <!-- 버전 정보 -->
+    <div style="text-align:center;padding:18px 0 8px;color:var(--muted);font-size:0.72rem;line-height:1.6">
+      LectureNote <span id="app-version">v0.4.0</span><br>
+      <span id="app-server-info" style="font-size:0.68rem"></span>
+    </div>
+
   </div>
 </div><!-- /#profile-screen -->
 
@@ -1050,6 +1056,7 @@
     <div class="sheet-handle"></div>
     <div class="sheet-title">서버 주소 설정</div>
     <div class="sheet-sub">APK에서 연결할 백엔드 URL을 변경합니다.</div>
+    <div style="font-size:0.7rem;color:var(--muted);margin-bottom:10px">LectureNote v0.4.0 · 현재: <span id="settings-current-server">—</span></div>
     <div class="form-group" style="margin-bottom:8px">
       <label>API URL</label>
       <input type="text" id="settings-api" placeholder="https://..." style="font-size:0.82rem">
@@ -1069,6 +1076,6 @@
 <!-- Toast -->
 <div id="toast"></div>
 
-<script src="assets/app.js?v=7"></script>
+<script src="assets/app.js?v=9"></script>
 </body>
 </html>
