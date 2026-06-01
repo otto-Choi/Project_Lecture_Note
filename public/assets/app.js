@@ -3,7 +3,7 @@
    ============================================================ */
 
 // ── API base ───────────────────────────────────────────────
-const DEFAULT_PROD_API = 'https://lecturenote.up.railway.app';  // APK 기본값
+const DEFAULT_PROD_API = 'https://web-production-94071.up.railway.app';  // APK 기본값 (Railway)
 const RENDER_API       = 'https://lecture-note-2cb6.onrender.com';
 
 function resolveApiBase() {
