@@ -626,6 +626,52 @@ showGenBanner('음성 처리 중', '음성을 텍스트로 변환하고 있습�
 
 ---
 
+## 15단계: 버그 수정 3종 — 다크모드 전면 재작업 · Gen-modal 완성 · SVG 인라인 전환 (2026-06-02)
+
+### 변경 1: 다크모드 배경색 전면 CSS 변수화
+
+**문제**: 이전 단계(13단계)에서 `body.dark` override를 추가했지만, 베이스 규칙의 하드코딩 색상(`#fff`, `#fafbfd`, `#fbfbfd`)이 여전히 남아 있어 dark 클래스가 없는 환경이나 캐시 문제 발생 시 흰 배경이 그대로 노출됨.
+
+**수정** (`public/assets/styles.css`):
+- `.note-view`, `.drop-zone`, `.rec-box`, `input[type]`, `.lecture-card`, `.note-item`, `.loading-box`, `.load-steps`, `.load-step .step-bullet`, `.sheet`, `.btn-del` 등 하드코딩 배경을 모두 `var(--surface)` 또는 `var(--bg)` 로 교체
+- override 방식에서 변수 방식으로 전환 → dark/light 전환이 자동으로 적용됨
+
+---
+
+### 변경 2: Gen-modal 완성 — null 방어 · 실시간 미리보기 · 자동스크롤
+
+**문제 1**: `showGenBanner()` 에서 `$('gm-title').textContent = ...` 등 모달 내부 요소 접근 시 null이면 이후 `classList.add('show')` 에 도달 못 해 모달 미표시.
+
+**문제 2**: 모달이 콘텐츠 영역을 가리는 구조여서 LLM이 생성하는 텍스트를 실시간으로 볼 수 없었음.
+
+**수정** (`public/assets/app.js`, `public/index.html`, `public/assets/styles.css`):
+- `showGenBanner()` 내 모든 요소 접근에 null 방어 추가 (`const el = $('id'); if (el) el.xxx`)
+- `#gm-preview` 요소 추가 — SSE 청크가 도착할 때마다 텍스트를 모달 내 미리보기 영역에 실시간 출력 + 자동 스크롤
+- Tab2(`#content`) 자동스크롤은 모달 최소화 후 탭에 있을 때 여전히 동작
+- `.gm-preview` CSS: `max-height: 180px`, `overflow-y: auto`, `pre-wrap`, 자동 스크롤
+
+---
+
+### 변경 3: 브라우저 캐시 무효화 (`?v=4`)
+
+**문제**: CSS/JS URL이 변경되지 않아 브라우저가 구버전을 캐시 서빙 → 최신 수정사항이 반영되지 않음.
+
+**수정** (`public/index.html`):
+- `assets/styles.css?v=4`, `assets/app.js?v=4` 쿼리 파라미터 추가
+
+---
+
+### 변경 4: SVG 아이콘 스프라이트 인라인 전환
+
+**문제**: `fetch('assets/icons.svg')` 비동기 로딩 방식은 Render 콜드 스타트(~30초) 중 서버 응답 지연 시 `.catch(() => {})` 로 무음 실패 → 전체 아이콘 소실.
+
+**수정** (`public/index.html`):
+- `<head>` 내 fetch 스크립트 완전 제거
+- 38개 SVG `<symbol>` 을 `<body>` 첫 요소로 직접 인라인 삽입 (11KB)
+- 네트워크 상태·서버 상태와 무관하게 항상 동기적으로 아이콘 사용 가능
+
+---
+
 ## 최종 환경 설정
 
 ### 설치 패키지
@@ -661,10 +707,10 @@ GEMINI_API_KEY=...
 | `src/services/aggregator.py` | 완료 |
 | `src/services/llm_service.py` | 완료 (스트리밍, thinking_budget=0) |
 | `src/services/stt_service.py` | 완료 (thinking_budget=0) |
-| `public/index.html` | 완료 (Auth+Profile+Pipeline A+Gen-modal+노트 검색바) |
-| `public/assets/app.js` | 완료 (authFetch, auth/profile, Pipeline A, Gen-modal, 노트 검색) |
-| `public/assets/styles.css` | 완료 (Auth/Profile/Pipeline/다크모드 오버라이드/검색바 CSS) |
-| `public/assets/icons.svg` | 완료 (18개 아이콘 — i-search 추가) |
+| `public/index.html` | 완료 (SVG 인라인·캐시버스팅·Gen-modal·검색바·Tab2 안내) |
+| `public/assets/app.js` | 완료 (gen-modal 완성·gm-preview·노트 검색·자동스크롤) |
+| `public/assets/styles.css` | 완료 (전체 배경 CSS 변수화·다크모드·검색바·gm-preview) |
+| `public/assets/icons.svg` | 완료 (38개 심볼 — i-search 포함, index.html에 인라인) |
 | `docs/planning/make_note.md` | 완료 (단일 호출용으로 수정) |
 
 ---
