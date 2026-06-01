@@ -32,9 +32,7 @@ const Cap = window.Capacitor;
 
 async function initNativeChrome() {
   if (!isCapacitor) return;
-  // APK에서만 서버 설정 버튼 및 프로필 메뉴 표시
-  const btnSettings = $('btn-settings');
-  if (btnSettings) btnSettings.style.display = 'inline-flex';
+  // APK에서만 서버 설정 row 표시
   const rowServer = $('profile-row-server');
   if (rowServer) rowServer.style.display = 'flex';
   _updateServerLabel();
