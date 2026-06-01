@@ -8,7 +8,7 @@
 
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/styles.css?v=4">
 
   <script>
     fetch('assets/icons.svg').then(r => r.text()).then(t => {
@@ -980,6 +980,7 @@
       </div>
     </div>
     <div class="pipeline-steps" id="gm-steps"></div>
+    <div id="gm-preview" class="gm-preview" style="display:none"></div>
     <div class="pipeline-counter" id="gm-timer">
       <svg style="width:13px;height:13px"><use href="#i-bolt"/></svg>
       경과 <span class="pipeline-counter-num" id="gm-timer-num">0</span>초
@@ -1000,6 +1001,6 @@
 <!-- Toast -->
 <div id="toast"></div>
 
-<script src="assets/app.js"></script>
+<script src="assets/app.js?v=4"></script>
 </body>
 </html>

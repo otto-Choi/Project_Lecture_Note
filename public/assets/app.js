@@ -780,12 +780,15 @@ function showGenBanner(title, sub, steps) {
       gmSteps.style.display = 'none';
     }
   }
-  $('gm-title').textContent = title;
-  $('gm-sub').textContent   = sub || '';
-  $('gm-timer-num').textContent = '0';
-  $('btn-gm-bg').style.display   = 'flex';
-  $('btn-gm-view').style.display = 'none';
-  $('gen-modal').classList.add('show');
+  const gmTitle = $('gm-title'); if (gmTitle) gmTitle.textContent = title;
+  const gmSub   = $('gm-sub');   if (gmSub)   gmSub.textContent   = sub || '';
+  const gmNum   = $('gm-timer-num'); if (gmNum) gmNum.textContent = '0';
+  const gmBg    = $('btn-gm-bg');   if (gmBg)   gmBg.style.display   = 'flex';
+  const gmView  = $('btn-gm-view'); if (gmView) gmView.style.display = 'none';
+  const gmPrev  = $('gm-preview');
+  if (gmPrev) { gmPrev.textContent = ''; gmPrev.style.display = 'none'; }
+  const modal = $('gen-modal');
+  if (modal) modal.classList.add('show');
 }
 
 function updateGenBanner(title, sub, stepId) {
@@ -1249,6 +1252,9 @@ async function doGenNote() {
             updateGenBanner('노트 생성 중 (LLM)', 'Gemini가 노트를 작성하는 중...', 'gen');
             res.classList.add('show');
             streamAutoScroll = true;
+            // gm-preview 표시
+            const gmPrev = $('gm-preview');
+            if (gmPrev) gmPrev.style.display = 'block';
             if (currentTab === 'tn') {
               setTimeout(() => res.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
             }
@@ -1257,6 +1263,10 @@ async function doGenNote() {
           genBannerNoteText = noteText2;
           viewEl.style.whiteSpace = 'pre-wrap';
           viewEl.textContent = noteText2;
+          // 모달 내 실시간 미리보기 스크롤
+          const gmPrev = $('gm-preview');
+          if (gmPrev) { gmPrev.textContent = noteText2; gmPrev.scrollTop = gmPrev.scrollHeight; }
+          // Tab2 자동스크롤 (모달 최소화 후 탭에서 볼 때)
           if (currentTab === 'tn') streamScrollToBottom();
         } else if (d.t === 'd') {
           gOutputId = d.id;
