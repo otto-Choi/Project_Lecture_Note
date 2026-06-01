@@ -9,7 +9,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.kbslab.lecturenote',
   appName: 'LectureNote',
-  webDir: 'www',
+  webDir: '../public',  // public/ 단일 소스로 통합
 
   // www/ 폴더 안의 자산만 사용 (외부 서버를 직접 로드하지 않음 → 디버그 시 file:// 로 동작)
   // 빠른 핫리로드 개발을 위해 server.url 을 임시로 사용할 수 있음 (배포 빌드 시 반드시 주석 처리):

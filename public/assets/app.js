@@ -3,17 +3,24 @@
    ============================================================ */
 
 // ── API base ───────────────────────────────────────────────
-const DEFAULT_PROD_API = 'https://lecture-note-2cb6.onrender.com';
+const DEFAULT_PROD_API = 'https://lecturenote.up.railway.app';  // APK 기본값
+const RENDER_API       = 'https://lecture-note-2cb6.onrender.com';
 
 function resolveApiBase() {
   const proto = location.protocol;
   const host  = location.hostname;
-  if (proto === 'file:' || proto === 'capacitor:') return DEFAULT_PROD_API;
+  // APK / 로컬 파일: localStorage 우선 → 없으면 Railway 기본값
+  if (proto === 'file:' || proto === 'capacitor:') {
+    return (localStorage.getItem('LN_API_BASE') || DEFAULT_PROD_API).replace(/\/+$/, '');
+  }
   if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
-  return '';
+  return '';  // Render 배포 시 상대경로
 }
-const API = resolveApiBase();
-window.LN = { API };
+let API = resolveApiBase();
+window.LN = {
+  get API() { return API; },
+  setAPI(u) { API = u.replace(/\/+$/, ''); localStorage.setItem('LN_API_BASE', API); },
+};
 
 // ── Capacitor bridge ───────────────────────────────────────
 const isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -21,6 +28,12 @@ const Cap = window.Capacitor;
 
 async function initNativeChrome() {
   if (!isCapacitor) return;
+  // APK에서만 서버 설정 버튼 및 프로필 메뉴 표시
+  const btnSettings = $('btn-settings');
+  if (btnSettings) btnSettings.style.display = 'inline-flex';
+  const rowServer = $('profile-row-server');
+  if (rowServer) rowServer.style.display = 'flex';
+  _updateServerLabel();
   try {
     const { StatusBar } = Cap.Plugins;
     if (StatusBar) {
@@ -712,6 +725,7 @@ function handleBackButton() {
   // Profile sub-screens (deeper → shallower)
   if ($('language-screen')?.classList.contains('active'))    { closeLanguageScreen(); return; }
   if ($('plan-screen')?.classList.contains('active'))        { closePlanScreen(); return; }
+  if ($('settings-sheet-mask')?.classList.contains('show'))   { closeSettings(); return; }
   if ($('account-info-screen')?.classList.contains('active')){ closeAccountInfo(); return; }
   if ($('change-pw-screen').classList.contains('active'))    { closeChangePw(); return; }
   if ($('edit-profile-screen').classList.contains('active')) { closeEditProfile(); return; }
@@ -857,6 +871,39 @@ function hideGenModal() {
 function openGenModal() { $('gen-modal').classList.add('show'); }
 window.hideGenModal = hideGenModal;
 window.openGenModal = openGenModal;
+
+// ── API Settings sheet (APK URL 전환) ──────────────────────
+function openSettings() {
+  const inp = $('settings-api');
+  if (inp) inp.value = API;
+  const sheet = $('settings-sheet-mask');
+  if (sheet) sheet.classList.add('show');
+}
+function closeSettings() {
+  const sheet = $('settings-sheet-mask');
+  if (sheet) sheet.classList.remove('show');
+}
+function applySettings() {
+  const v = ($('settings-api')?.value || '').trim();
+  if (v) window.LN.setAPI(v);
+  closeSettings();
+  _updateServerLabel();
+}
+function _updateServerLabel() {
+  const el = $('profile-server-value');
+  if (!el) return;
+  if (API.includes('railway')) el.textContent = 'Railway';
+  else if (API.includes('onrender')) el.textContent = 'Render';
+  else el.textContent = new URL(API).hostname;
+}
+function resetSettings() {
+  window.LN.setAPI(DEFAULT_PROD_API);
+  const inp = $('settings-api'); if (inp) inp.value = DEFAULT_PROD_API;
+}
+window.openSettings  = openSettings;
+window.closeSettings = closeSettings;
+window.applySettings = applySettings;
+window.resetSettings = resetSettings;
 
 function jumpToNoteResult() {
   showTab('tn');
