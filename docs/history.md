@@ -516,6 +516,66 @@ showGenBanner('음성 처리 중', '음성을 텍스트로 변환하고 있습�
 
 ---
 
+---
+
+## 13단계: 다크모드 대비 개선 · Gen-modal · 노트 내 검색 (2026-06-02)
+
+### 변경 1: 다크모드 색상 대비 수정
+
+**문제**: `body.dark` 에서 CSS 변수를 오버라이드하지만, 다수 컴포넌트가 `#fff`/`#fafbfd` 등을 하드코딩해 다크모드에서 흰 배경이 그대로 노출됨. 또한 `var(--navy)` 텍스트(`#1A2D5E`)가 어두운 배경에서 거의 보이지 않음.
+
+**해결** (`public/assets/styles.css`):
+- `body.dark {}` 블록 직후에 element-level 오버라이드 섹션 추가
+- 입력창·드롭존·녹음박스·노트뷰·강의카드·로딩박스·시트·삭제버튼 → `background: var(--surface)`
+- `.card-title`, `.result-title`, `h1/h2`, 파이프라인 활성 스텝 등 네이비 텍스트 → `#93B8E6` (라이트 블루)
+- 파일선택·녹음완료 초록 텍스트 → `#6EE7A0`, 에러 텍스트 → `#F87171`
+- 기존 CSS 구조 변경 없이 override 방식으로만 처리 (최소 침습)
+
+---
+
+### 변경 2: 노트 생성 Gen-modal 팝업 UX
+
+**문제**: 생성 버튼을 누르면 즉시 상단 배너로 전환되어 생성이 시작됐는지 인지하기 어려움.
+
+**새 흐름**:
+1. "노트 생성하기" 클릭 → 파이프라인 팝업(`#gen-modal`) 자동 표시
+2. "백그라운드에서 진행" 클릭 → 팝업 닫힘, 상단 배너(`#gen-banner`) 유지
+3. 배너 좌측 영역(`.gen-banner-main`) 클릭 → 팝업 재표시
+4. 생성 완료 → 팝업 내 "노트 보기 →" 버튼 활성화, 파이프라인 전체 완료 처리
+
+**구현 파일**:
+- `public/index.html`: `.gen-banner-main` 래퍼 추가 (`onclick="openGenModal()"`), `#gen-modal` 오버레이 신규 삽입 (기존 `.loading-mask` 재사용)
+- `public/assets/styles.css`: `.gen-banner-main` CSS 추가 (cursor: pointer, hover opacity)
+- `public/assets/app.js`:
+  - `showGenBanner(title, sub, steps)` — `steps` 파라미터 추가, 타이머에 gen-modal 카운터 연동
+  - `updateGenBanner(title, sub, stepId)` — `stepId` 추가, `advanceGenStep()` 호출
+  - `advanceGenStep(stepId)` — `#gm-steps` 컨테이너 스코프로 파이프라인 스텝 진행
+  - `completeGenBanner()` — 모달 내 전체 스텝 완료 처리 + "보기" 버튼 표시
+  - `hideGenModal()` / `openGenModal()` 신규 추가
+  - `doGenNote()` — `genPipeline` 변수 추가 후 `showGenBanner`에 전달, 각 단계에 `stepId` 주입
+
+---
+
+### 변경 3: 노트 내 키워드 검색
+
+**구현 위치**: 노트 생성 결과(Tab2) 및 노트 조회(Tab3) 카드
+
+**동작**:
+- 결과 카드 "검색" 버튼(Tab2는 노트 완료 시 표시) → 검색바 토글
+- 타이핑 즉시 DOM TreeWalker로 텍스트 노드 순회 → `<mark class="search-mark">` 삽입
+- 현재 포커스 매치는 `search-mark-current`(주황) 으로 구분, 나머지는 노란색
+- 매치 수 표시 (`N / total`), ↑↓ 버튼 및 `Enter` / `Shift+Enter` 로 이동
+- 검색 취소(`✕`) 또는 다른 노트 로드 시 `renderMd(el, el.dataset.raw)` 로 원본 복원
+- 다크모드: `mark` 색상 별도 오버라이드 (`#713F12` / `#C2410C`)
+
+**구현 파일**:
+- `public/assets/icons.svg`: `i-search` 심볼 추가
+- `public/assets/styles.css`: `.note-search-bar`, `.search-nav-btn`, `.search-close-btn`, `mark.search-mark` CSS 추가
+- `public/index.html`: Tab2·Tab3 결과카드에 검색 버튼 + 검색바 HTML 추가
+- `public/assets/app.js`: `toggleNoteSearch`, `doNoteSearch`, `searchNav`, `closeNoteSearch`, `_scrollToMark`, `_updateSearchCount` 함수 신규 구현
+
+---
+
 ## 최종 환경 설정
 
 ### 설치 패키지
@@ -551,10 +611,10 @@ GEMINI_API_KEY=...
 | `src/services/aggregator.py` | 완료 |
 | `src/services/llm_service.py` | 완료 (스트리밍, thinking_budget=0) |
 | `src/services/stt_service.py` | 완료 (thinking_budget=0) |
-| `public/index.html` | 완료 (Auth+Profile+Pipeline A 전면 개편) |
-| `public/assets/app.js` | 완료 (authFetch, auth/profile 핸들러, Pipeline A) |
-| `public/assets/styles.css` | 완료 (Auth/Profile/Pipeline CSS 추가) |
-| `public/assets/icons.svg` | 완료 (17개 신규 아이콘 추가) |
+| `public/index.html` | 완료 (Auth+Profile+Pipeline A+Gen-modal+노트 검색바) |
+| `public/assets/app.js` | 완료 (authFetch, auth/profile, Pipeline A, Gen-modal, 노트 검색) |
+| `public/assets/styles.css` | 완료 (Auth/Profile/Pipeline/다크모드 오버라이드/검색바 CSS) |
+| `public/assets/icons.svg` | 완료 (18개 아이콘 — i-search 추가) |
 | `docs/planning/make_note.md` | 완료 (단일 호출용으로 수정) |
 
 ---
