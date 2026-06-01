@@ -55,6 +55,33 @@ body.dark {
   --warn-soft:   #78350F;
 }
 
+/* ── Dark mode element overrides ──────────────────────────── */
+body.dark input[type="text"],
+body.dark input[type="number"],
+body.dark textarea { background: var(--surface); color: var(--text); }
+body.dark .drop-zone { background: var(--surface); }
+body.dark .drop-zone:hover, body.dark .drop-zone.over { background: var(--blue-soft); }
+body.dark .rec-box { background: var(--surface); }
+body.dark .note-view { background: var(--surface); }
+body.dark .lecture-card, body.dark .note-item { background: var(--surface); }
+body.dark .loading-box { background: var(--surface); }
+body.dark .sheet { background: var(--surface); }
+body.dark .btn-del { background: var(--surface); border-color: rgba(239,68,68,0.3); }
+/* Navy text → visible light blue in dark mode */
+body.dark .card-title,
+body.dark .result-title,
+body.dark .load-text,
+body.dark .sheet-title,
+body.dark .note-view h1,
+body.dark .note-view h2 { color: #93B8E6; }
+body.dark .load-step.active { color: #93B8E6; }
+body.dark .pipeline-step.active .pipeline-step-label { color: #93B8E6; }
+/* Hardcoded semantic text colors */
+body.dark .info-banner,
+body.dark .selected-banner { color: #93B8E6; }
+body.dark .file-chosen, body.dark .rec-result { color: #6EE7A0; }
+body.dark .err-box { color: #F87171; border-color: rgba(239,68,68,0.3); }
+
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body {
   height: 100%;
@@ -1471,6 +1498,15 @@ textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
   0%,100% { opacity:1; transform:scale(1); }
   50%      { opacity:0.4; transform:scale(0.75); }
 }
+.gen-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.gen-banner-main:hover { opacity: 0.88; }
 .gen-banner-body { flex: 1; min-width: 0; }
 .gen-banner-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gen-banner-sub   { font-size: 0.74rem; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1487,6 +1523,94 @@ textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
   flex-shrink: 0;
 }
 .gen-banner-btn:hover { background: rgba(255,255,255,0.3); }
+
+/* ── Note search bar ────────────────────────────────────── */
+.note-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.note-search-input-wrap {
+  position: relative;
+  flex: 1;
+}
+.note-search-input-wrap svg {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 13px; height: 13px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.note-search-input-wrap input {
+  width: 100%;
+  padding: 7px 10px 7px 28px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  background: var(--bg);
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+.note-search-input-wrap input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+.search-count {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 38px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.search-nav-btn {
+  width: 28px; height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+.search-nav-btn svg { width: 13px; height: 13px; }
+.search-nav-btn:hover { border-color: var(--blue); color: var(--blue); }
+.search-close-btn {
+  width: 28px; height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+.search-close-btn svg { width: 13px; height: 13px; }
+.search-close-btn:hover { background: var(--err-soft); color: var(--err); }
+mark.search-mark {
+  background: #FEF08A;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+mark.search-mark-current {
+  background: #FB923C;
+  color: #fff;
+  border-radius: 2px;
+}
+body.dark mark.search-mark { background: #713F12; color: #FEF9C3; }
+body.dark mark.search-mark-current { background: #C2410C; color: #fff; }
 
 /* ── Password strength ──────────────────────────────────── */
 .pw-strength {

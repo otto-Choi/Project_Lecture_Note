@@ -53,4 +53,8 @@
     <rect x="27.5" y="23.5" width="6" height="1.2" fill="#6E6E73"></rect>
     <line x1="24" y1="13" x2="24" y2="33" stroke="#0F1B3D" stroke-width="0.8"></line>
   </symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="8"/>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </symbol>
 </svg>

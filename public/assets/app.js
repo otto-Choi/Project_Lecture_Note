@@ -751,7 +751,7 @@ let genBannerTimer   = null;
 let genBannerNoteText = '';
 let genBannerOutputId = null;
 
-function showGenBanner(title, sub) {
+function showGenBanner(title, sub, steps) {
   genBannerElapsed = 0;
   clearInterval(genBannerTimer);
   genBannerNoteText = '';
@@ -767,26 +767,85 @@ function showGenBanner(title, sub) {
     genBannerElapsed++;
     const el = $('gen-banner-time');
     if (el) el.textContent = genBannerElapsed + '초';
+    const gmEl = $('gm-timer-num');
+    if (gmEl) gmEl.textContent = genBannerElapsed;
   }, 1000);
+  // Show gen modal with pipeline steps
+  const gmSteps = $('gm-steps');
+  if (gmSteps) {
+    if (steps && steps.length) {
+      gmSteps.innerHTML = buildPipelineHTML(steps);
+      gmSteps.style.display = 'flex';
+    } else {
+      gmSteps.style.display = 'none';
+    }
+  }
+  $('gm-title').textContent = title;
+  $('gm-sub').textContent   = sub || '';
+  $('gm-timer-num').textContent = '0';
+  $('btn-gm-bg').style.display   = 'flex';
+  $('btn-gm-view').style.display = 'none';
+  $('gen-modal').classList.add('show');
 }
 
-function updateGenBanner(title, sub) {
+function updateGenBanner(title, sub, stepId) {
   $('gen-banner-title').textContent = title;
   $('gen-banner-sub').textContent   = sub || '';
+  const gmTitle = $('gm-title');
+  const gmSub   = $('gm-sub');
+  if (gmTitle) gmTitle.textContent = title;
+  if (gmSub)   gmSub.textContent   = sub || '';
+  if (stepId)  advanceGenStep(stepId);
+}
+
+function advanceGenStep(stepId) {
+  const container = $('gm-steps');
+  if (!container) return;
+  const wraps = container.querySelectorAll('.pipeline-step-wrap');
+  let foundIdx = -1;
+  wraps.forEach((el, i) => { if (el.dataset.step === stepId) foundIdx = i; });
+  if (foundIdx < 0) return;
+  wraps.forEach((el, i) => {
+    const inner = el.querySelector('.pipeline-step');
+    el.classList.toggle('done',   i <= foundIdx);
+    el.classList.toggle('active', i === foundIdx + 1);
+    if (inner) {
+      inner.classList.toggle('done',   i <= foundIdx);
+      inner.classList.toggle('active', i === foundIdx + 1);
+    }
+  });
 }
 
 function completeGenBanner() {
   clearInterval(genBannerTimer);
-  updateGenBanner('노트 생성 완료', `${genBannerElapsed}초 · ${genBannerNoteText.length.toLocaleString()}자`);
+  const completedText = `${genBannerElapsed}초 · ${genBannerNoteText.length.toLocaleString()}자`;
+  updateGenBanner('노트 생성 완료', completedText);
   $('gen-banner').classList.add('done');
   $('gen-banner-btn').style.display = 'inline-flex';
+  // Update modal: mark all steps done, show 보기 button
+  const container = $('gm-steps');
+  if (container) {
+    container.querySelectorAll('.pipeline-step-wrap, .pipeline-step').forEach(el => {
+      el.classList.add('done');
+      el.classList.remove('active');
+    });
+  }
+  $('btn-gm-bg').style.display   = 'none';
+  $('btn-gm-view').style.display = 'inline-flex';
 }
 
 function errorGenBanner(msg) {
   clearInterval(genBannerTimer);
   updateGenBanner('생성 실패', msg || '오류가 발생했습니다.');
   $('gen-banner').classList.add('error');
+  const bgBtn = $('btn-gm-bg');
+  if (bgBtn) { bgBtn.textContent = '닫기'; bgBtn.style.display = 'flex'; }
 }
+
+function hideGenModal() { $('gen-modal').classList.remove('show'); }
+function openGenModal()  { $('gen-modal').classList.add('show'); }
+window.hideGenModal = hideGenModal;
+window.openGenModal = openGenModal;
 
 function jumpToNoteResult() {
   showTab('tn');
@@ -796,6 +855,110 @@ function jumpToNoteResult() {
   }
 }
 window.jumpToNoteResult = jumpToNoteResult;
+
+// ── Note in-page search ────────────────────────────────────
+let noteSearchMarks = [];
+let noteSearchIdx   = -1;
+
+function _noteContainer(tab) {
+  return tab === 'tn' ? $('view-tn') : $('th-note-view');
+}
+
+function toggleNoteSearch(tab) {
+  const bar = $(`${tab}-search-bar`);
+  if (!bar) return;
+  const showing = bar.style.display !== 'none';
+  if (showing) {
+    closeNoteSearch(tab);
+  } else {
+    bar.style.display = 'flex';
+    const inp = $(`${tab}-search-input`);
+    if (inp) { inp.value = ''; inp.focus(); }
+  }
+}
+
+function doNoteSearch(tab) {
+  const inp       = $(`${tab}-search-input`);
+  const container = _noteContainer(tab);
+  if (!inp || !container) return;
+  const query = inp.value.trim();
+
+  // Restore original markdown rendering before re-searching
+  if (container.dataset.raw) renderMd(container, container.dataset.raw);
+  noteSearchMarks = [];
+  noteSearchIdx   = -1;
+
+  if (!query) { _updateSearchCount(tab); return; }
+
+  const lq = query.toLowerCase();
+  const nodes = [];
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+
+  for (const node of nodes) {
+    const text  = node.textContent;
+    const lower = text.toLowerCase();
+    if (!lower.includes(lq)) continue;
+    const frag = document.createDocumentFragment();
+    let pos = 0, idx;
+    while ((idx = lower.indexOf(lq, pos)) !== -1) {
+      if (idx > pos) frag.appendChild(document.createTextNode(text.slice(pos, idx)));
+      const mark = document.createElement('mark');
+      mark.className = 'search-mark';
+      mark.textContent = text.slice(idx, idx + query.length);
+      frag.appendChild(mark);
+      noteSearchMarks.push(mark);
+      pos = idx + query.length;
+    }
+    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+    node.parentNode.replaceChild(frag, node);
+  }
+
+  if (noteSearchMarks.length) { noteSearchIdx = 0; _scrollToMark(); }
+  _updateSearchCount(tab);
+}
+
+function searchNav(tab, dir) {
+  if (!noteSearchMarks.length) return;
+  noteSearchIdx = (noteSearchIdx + dir + noteSearchMarks.length) % noteSearchMarks.length;
+  _scrollToMark();
+  _updateSearchCount(tab);
+}
+
+function closeNoteSearch(tab) {
+  const bar = $(`${tab}-search-bar`);
+  if (bar) bar.style.display = 'none';
+  const container = _noteContainer(tab);
+  if (container && container.dataset.raw) renderMd(container, container.dataset.raw);
+  noteSearchMarks = [];
+  noteSearchIdx   = -1;
+  _updateSearchCount(tab);
+}
+
+function _scrollToMark() {
+  noteSearchMarks.forEach((m, i) =>
+    m.classList.toggle('search-mark-current', i === noteSearchIdx)
+  );
+  if (noteSearchMarks[noteSearchIdx]) {
+    noteSearchMarks[noteSearchIdx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function _updateSearchCount(tab) {
+  const el  = $(`${tab}-search-count`);
+  const inp = $(`${tab}-search-input`);
+  if (!el) return;
+  const hasQuery = inp && inp.value.trim();
+  if (!hasQuery) { el.textContent = ''; return; }
+  el.textContent = noteSearchMarks.length
+    ? `${noteSearchIdx + 1} / ${noteSearchMarks.length}`
+    : '없음';
+}
+
+window.toggleNoteSearch = toggleNoteSearch;
+window.doNoteSearch     = doNoteSearch;
+window.searchNav        = searchNav;
+window.closeNoteSearch  = closeNoteSearch;
 
 // ── Pipeline A loading overlay ─────────────────────────────
 const PIPELINE_NOTE_AUDIO = [
@@ -1028,11 +1191,14 @@ async function doGenNote() {
   else if (audioFile) { fd.append('audio_file', audioFile); hasAudio = true; }
   if (noteText) fd.append('note_text', noteText);
 
-  // Start banner (non-blocking — user can navigate tabs during generation)
+  // Start banner + modal (non-blocking — user can navigate tabs during generation)
+  const genPipeline = hasAudio ? PIPELINE_NOTE_AUDIO : PIPELINE_NOTE_NOAUDIO;
   showGenBanner(
     hasAudio ? '음성 처리 중' : '자료 처리 중',
-    hasAudio ? '음성을 텍스트로 변환하고 있습니다.' : '업로드된 자료를 정리하고 있습니다.'
+    hasAudio ? '음성을 텍스트로 변환하고 있습니다.' : '업로드된 자료를 정리하고 있습니다.',
+    genPipeline
   );
+  if (hasAudio) setTimeout(() => advanceGenStep('stt'), 400);
   $('btn-gen').disabled = true;
 
   const res    = $('res-tn');
@@ -1052,7 +1218,7 @@ async function doGenNote() {
       const e = await r.json().catch(() => ({}));
       throw new Error(e.detail || `오류 ${r.status}`);
     }
-    updateGenBanner('자료 통합 중', 'STT + PDF + 필기 병합 중...');
+    updateGenBanner('자료 통합 중', 'STT + PDF + 필기 병합 중...', 'agg');
 
     const reader  = r.body.getReader();
     const decoder = new TextDecoder();
@@ -1072,7 +1238,7 @@ async function doGenNote() {
         if (d.t === 'c') {
           if (firstChunk) {
             firstChunk = false;
-            updateGenBanner('노트 생성 중 (LLM)', 'Gemini가 노트를 작성하는 중...');
+            updateGenBanner('노트 생성 중 (LLM)', 'Gemini가 노트를 작성하는 중...', 'gen');
             res.classList.add('show');
             streamAutoScroll = true;
             if (currentTab === 'tn') {
@@ -1092,7 +1258,7 @@ async function doGenNote() {
           $('meta-tn').innerHTML = `강의 ID: ${d.lid}  ·  노트 ID: ${d.id}  ·  ${noteText2.length.toLocaleString()}자`;
           $('tn-ok-badge').style.display = 'inline-flex';
           $('tn-result-label').textContent = '노트 생성 완료';
-          ['btn-dl-tn','btn-pdf-tn','btn-goto-th'].forEach(id => $(id).style.display = 'inline-flex');
+          ['btn-dl-tn','btn-pdf-tn','btn-goto-th','btn-search-tn'].forEach(id => $(id).style.display = 'inline-flex');
           viewEl.dataset.raw   = noteText2;
           viewEl.dataset.title = `${week}주차 노트`;
           completeGenBanner();
@@ -1331,6 +1497,7 @@ window.loadThNotes = loadThNotes;
 
 async function loadThNote(outputId, weekLabel) {
   thOutputId = outputId;
+  closeNoteSearch('th');
   document.querySelectorAll('#th-notes-list .note-item').forEach(el => el.classList.remove('selected'));
   const item = $(`thni-${outputId}`);
   if (item) item.classList.add('selected');

@@ -663,12 +663,14 @@
 
   <!-- ─── Gen banner (background processing) ── -->
   <div id="gen-banner" class="gen-banner" style="display:none">
-    <div class="gen-banner-dot"></div>
-    <div class="gen-banner-body">
-      <div class="gen-banner-title" id="gen-banner-title">노트 생성 중</div>
-      <div class="gen-banner-sub" id="gen-banner-sub">처리를 시작합니다...</div>
+    <div class="gen-banner-main" onclick="openGenModal()">
+      <div class="gen-banner-dot"></div>
+      <div class="gen-banner-body">
+        <div class="gen-banner-title" id="gen-banner-title">노트 생성 중</div>
+        <div class="gen-banner-sub" id="gen-banner-sub">처리를 시작합니다...</div>
+      </div>
+      <span class="gen-banner-time" id="gen-banner-time">0초</span>
     </div>
-    <span class="gen-banner-time" id="gen-banner-time">0초</span>
     <button class="gen-banner-btn" id="gen-banner-btn" onclick="jumpToNoteResult()" style="display:none">보기 →</button>
   </div>
 
@@ -802,6 +804,9 @@
             <span id="tn-result-label">노트 생성 중...</span>
           </div>
           <div class="result-actions">
+            <button class="btn-action muted" id="btn-search-tn" style="display:none" onclick="toggleNoteSearch('tn')">
+              <svg><use href="#i-search"/></svg>검색
+            </button>
             <button class="btn-action" id="btn-pdf-tn" style="display:none" onclick="exportCurrentNotePdf()">
               <svg><use href="#i-pdf"/></svg>PDF
             </button>
@@ -814,6 +819,24 @@
           </div>
         </div>
         <div class="meta-info" id="meta-tn"></div>
+        <div class="note-search-bar" id="tn-search-bar" style="display:none">
+          <div class="note-search-input-wrap">
+            <svg><use href="#i-search"/></svg>
+            <input type="text" id="tn-search-input" placeholder="노트 내 검색..."
+                   oninput="doNoteSearch('tn')"
+                   onkeydown="if(event.key==='Enter')searchNav('tn',event.shiftKey?-1:1)">
+          </div>
+          <span class="search-count" id="tn-search-count"></span>
+          <button class="search-nav-btn" onclick="searchNav('tn',-1)" title="이전 결과">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+          <button class="search-nav-btn" onclick="searchNav('tn',1)" title="다음 결과">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <button class="search-close-btn" onclick="closeNoteSearch('tn')" title="닫기">
+            <svg><use href="#i-x"/></svg>
+          </button>
+        </div>
         <div class="note-view" id="view-tn"></div>
       </div>
 
@@ -842,6 +865,9 @@
             노트 내용
           </div>
           <div class="result-actions">
+            <button class="btn-action muted" onclick="toggleNoteSearch('th')">
+              <svg><use href="#i-search"/></svg>검색
+            </button>
             <button class="btn-action muted" id="btn-edit-note" onclick="startEditNote()">
               <svg><use href="#i-pen"/></svg>편집
             </button>
@@ -852,6 +878,24 @@
               <svg><use href="#i-download"/></svg>HTML
             </button>
           </div>
+        </div>
+        <div class="note-search-bar" id="th-search-bar" style="display:none">
+          <div class="note-search-input-wrap">
+            <svg><use href="#i-search"/></svg>
+            <input type="text" id="th-search-input" placeholder="노트 내 검색..."
+                   oninput="doNoteSearch('th')"
+                   onkeydown="if(event.key==='Enter')searchNav('th',event.shiftKey?-1:1)">
+          </div>
+          <span class="search-count" id="th-search-count"></span>
+          <button class="search-nav-btn" onclick="searchNav('th',-1)" title="이전 결과">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+          <button class="search-nav-btn" onclick="searchNav('th',1)" title="다음 결과">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <button class="search-close-btn" onclick="closeNoteSearch('th')" title="닫기">
+            <svg><use href="#i-x"/></svg>
+          </button>
         </div>
         <div class="note-view" id="th-note-view"></div>
         <div id="th-note-edit" style="display:none;margin-top:10px">
@@ -909,6 +953,40 @@
     <div class="pipeline-counter" id="load-timer">
       <svg style="width:13px;height:13px"><use href="#i-bolt"/></svg>
       경과 <span class="pipeline-counter-num" id="load-timer-num">0</span>초
+    </div>
+  </div>
+</div>
+
+<!-- Gen modal (note generation progress popup) -->
+<div class="loading-mask" id="gen-modal">
+  <div class="loading-box">
+    <div class="load-header">
+      <div class="load-logo">
+        <svg viewBox="0 0 48 48">
+          <rect width="48" height="48" rx="11" fill="#1A2D5E"/>
+          <path d="M12 32 L12 14 L23 14 L23 32 Z" fill="#4B82C5"/>
+          <path d="M25 32 L25 14 L36 14 L36 32 Z" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <div class="load-text" id="gm-title">노트 생성 중</div>
+        <div class="load-sub" id="gm-sub">처리를 시작합니다...</div>
+      </div>
+    </div>
+    <div class="pipeline-steps" id="gm-steps"></div>
+    <div class="pipeline-counter" id="gm-timer">
+      <svg style="width:13px;height:13px"><use href="#i-bolt"/></svg>
+      경과 <span class="pipeline-counter-num" id="gm-timer-num">0</span>초
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" id="btn-gm-bg" onclick="hideGenModal()"
+        style="font-size:0.86rem;padding:12px 16px;min-height:44px;flex:1">
+        백그라운드에서 진행
+      </button>
+      <button class="btn btn-primary" id="btn-gm-view" onclick="hideGenModal();jumpToNoteResult();"
+        style="display:none;font-size:0.86rem;padding:12px 16px;min-height:44px;background:var(--ok)">
+        노트 보기 →
+      </button>
     </div>
   </div>
 </div>
