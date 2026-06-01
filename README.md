@@ -181,6 +181,7 @@ Step 0 분석 결과(주차별 커리큘럼, 핵심 용어 사전, 교수법 방
 | 문서 | 경로 | 내용 |
 |---|---|---|
 | 배포 플랜 | [plan.md](plan.md) | 배포 전 필수 수정, Railway 배포 순서, 포트폴리오 작업 목록 |
+| 성장 전략 | [growth.md](growth.md) | 요금제 설계, B2C→B2B 확장 전략, 기술 로드맵, 경쟁 포지셔닝 |
 | 개발 이력 | [history.md](history.md) | 단계별 구현 내용, 트러블슈팅 상세 기록 |
 | 디렉토리 구조 | [STRUCTURE.md](STRUCTURE.md) | 재배치 목적·결과·현재 구조 트리 |
 | 발표 자료 | [presentations/](presentations/) | 1~4차 PDF, PPTX, 대본, 스크린샷 |
