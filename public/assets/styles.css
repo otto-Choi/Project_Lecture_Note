@@ -72,7 +72,7 @@ body.dark .card-title,
 body.dark .result-title,
 body.dark .load-text,
 body.dark .sheet-title,
-body.dark .note-view h1,
+body.dark .note-view h1 { color: #93B8E6; background: var(--blue-soft); border-left-color: #4B82C5; }
 body.dark .note-view h2 { color: #93B8E6; }
 body.dark .load-step.active { color: #93B8E6; }
 body.dark .pipeline-step.active .pipeline-step-label { color: #93B8E6; }
@@ -554,7 +554,16 @@ textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
   word-break: keep-all;
   overflow-x: hidden;
 }
-.note-view h1 { font-size: 1.18em; color: var(--navy); margin: 1em 0 0.4em; border-bottom: 2px solid var(--border); padding-bottom: 4px; }
+.note-view h1 {
+  font-size: 1.1em;
+  color: var(--navy);
+  margin: 1.6em 0 0.6em;
+  padding: 8px 10px;
+  background: var(--blue-soft);
+  border-left: 3px solid var(--blue);
+  border-radius: 6px;
+}
+.note-view h1:first-child { margin-top: 0.2em; }
 .note-view h2 { font-size: 1.04em; color: var(--navy); margin: 0.9em 0 0.3em; }
 .note-view h3 { font-size: 0.96em; color: var(--text-soft); margin: 0.7em 0 0.25em; }
 .note-view p  { margin: 0.4em 0; }

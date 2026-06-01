@@ -762,7 +762,7 @@ function showGenBanner(title, sub, steps) {
   $('gen-banner-btn').style.display = 'none';
   const b = $('gen-banner');
   b.className = 'gen-banner';
-  b.style.display = 'flex';
+  b.style.display = 'none'; // 배너는 모달 최소화 시 등장
   genBannerTimer = setInterval(() => {
     genBannerElapsed++;
     const el = $('gen-banner-time');
@@ -832,6 +832,11 @@ function completeGenBanner() {
   }
   $('btn-gm-bg').style.display   = 'none';
   $('btn-gm-view').style.display = 'inline-flex';
+  // 모달이 최소화 상태였다면 배너도 완료 표시
+  if ($('gen-banner').style.display !== 'none') {
+    $('gen-banner').classList.add('done');
+    $('gen-banner-btn').style.display = 'inline-flex';
+  }
 }
 
 function errorGenBanner(msg) {
@@ -842,8 +847,11 @@ function errorGenBanner(msg) {
   if (bgBtn) { bgBtn.textContent = '닫기'; bgBtn.style.display = 'flex'; }
 }
 
-function hideGenModal() { $('gen-modal').classList.remove('show'); }
-function openGenModal()  { $('gen-modal').classList.add('show'); }
+function hideGenModal() {
+  $('gen-modal').classList.remove('show');
+  $('gen-banner').style.display = 'flex'; // 모달 최소화 → 배너 등장
+}
+function openGenModal() { $('gen-modal').classList.add('show'); }
 window.hideGenModal = hideGenModal;
 window.openGenModal = openGenModal;
 
