@@ -672,6 +672,65 @@ showGenBanner('음성 처리 중', '음성을 텍스트로 변환하고 있습�
 
 ---
 
+## 16단계: 배포 플랫폼 Railway 재전환 (2026-06-07)
+
+### 배경
+
+12단계에서 Railway 무료 한도 소진으로 Render로 전환했으나, Railway 유료 플랜 또는 새 프로젝트로 재전환.
+
+### 변경 사항
+
+- 배포 URL: `https://lecture-note-2cb6.onrender.com` → `https://lecturenote.up.railway.app`
+- `package/www/index.html` `window.__LN_API_BASE__` 업데이트
+- `docs/plan.md` 배포 순서 Railway 기준으로 재정비
+- `.gitignore` — `package/` 추가 (APK/AAB 바이너리 + signing.keystore 커밋 방지)
+
+---
+
+## 17단계: Android 패키징 — Capacitor APK + PWABuilder TWA (2026-06-07)
+
+### 목표
+
+웹앱을 Android 앱으로 패키징해 실기기 시연 및 Google Play 스토어 등록 준비.
+
+### 방법 1: Capacitor 6 (디버그 APK)
+
+- appId: `com.kbslab.lecturenote`
+- `package/capacitor.config.ts` — `webDir: '../public'` (루트 `public/` 소스 사용)
+- `package/www/` — Capacitor 전용 프론트 에셋 (public/과 별도 관리)
+  - `resolveApiBase()` 함수: Capacitor 환경 감지 + localStorage 오버라이드 + ⚙ 설정 시트
+  - html2pdf.js + Capacitor Filesystem + Share 플러그인 통합
+  - 백버튼(Capacitor App), StatusBar(Deep Navy), SplashScreen, 안전영역(env(safe-area-inset-*))
+  - 폰트: Pretendard
+- 결과물: `package/LectureNote.apk` (디버그 빌드, 사이드로드용)
+
+### 방법 2: PWABuilder TWA (릴리즈 APK + AAB)
+
+- **도구**: [pwabuilder.com](https://pwabuilder.com) — PWA URL 입력 → Android TWA(Trusted Web Activity) 패키지 자동 생성
+- appId: `com.cau.lecturenote` (Capacitor appId와 다름 — 스토어에선 이 ID 사용)
+- 결과물 (`package/LectureNote - Google Play package/`):
+  - `LectureNote.apk` — 사이드로드용 릴리즈 APK
+  - `LectureNote.aab` — Google Play 스토어 업로드용 AAB (Android App Bundle)
+  - `signing.keystore` + `signing-key-info.txt` — 업로드 서명 키 (보안 파일, Git 커밋 금지)
+  - `assetlinks.json` — TWA 도메인 소유권 검증 파일 (Play Store 연결 시 `/.well-known/assetlinks.json` 로 서빙 필요)
+
+### Capacitor vs PWABuilder 비교
+
+| 항목 | Capacitor | PWABuilder TWA |
+|------|-----------|----------------|
+| appId | `com.kbslab.lecturenote` | `com.cau.lecturenote` |
+| 빌드 산출물 | 디버그 APK | 릴리즈 APK + AAB |
+| 용도 | 시연용 사이드로드 | Play Store 등록 |
+| 프론트 소스 | `package/www/` (별도 관리) | Railway 배포 URL을 WebView로 래핑 |
+| 플러그인 | Capacitor 플러그인 풀셋 | 제한적 (표준 TWA) |
+
+### 주의사항
+
+- `signing.keystore` 분실 시 동일 appId로 스토어 재등록 불가 — 안전한 곳에 백업 필요
+- `package/` 전체가 `.gitignore`에 추가됨 → 바이너리·키스토어·node_modules 모두 Git 제외
+
+---
+
 ## 최종 환경 설정
 
 ### 설치 패키지
@@ -750,14 +809,20 @@ GEMINI_API_KEY=...
 
 ## 서버 실행 방법
 ```bash
-uvicorn main:app --reload
-# frontend/index.html 을 브라우저에서 직접 열기
+# 루트에서 실행
+launch.bat
+# 또는 직접
+uvicorn main:app --reload --app-dir src
 # Swagger UI: http://localhost:8000/docs
 ```
 
 ### 사용 흐름
-1. `uvicorn main:app --reload` 서버 실행
-2. `frontend/index.html` 파일을 브라우저에서 열기
-3. **① 강의 등록**: 강의계획서 PDF 업로드 → 자동 분석 → 완료 시 "노트 생성하기 →" 클릭
-4. **② 노트 생성**: 강의 선택 → 녹음(인앱 or 파일) + PDF + 필기 → 주차 입력 → 생성 (실시간 스트리밍)
-5. **③ 노트 조회**: 강의 선택 → 노트 선택 → 열람·편집·다운로드
+1. `launch.bat` 서버 실행 → `http://localhost:8000` 접속 (또는 Railway 배포 URL)
+2. **① 강의 등록**: 강의계획서 PDF 업로드 → 자동 분석 → 완료 시 "노트 생성하기 →" 클릭
+3. **② 노트 생성**: 강의 선택 → 녹음(인앱 or 파일) + PDF + 필기 → 주차 입력 → 생성 (실시간 스트리밍)
+4. **③ 노트 조회**: 강의 선택 → 노트 선택 → 열람·편집·다운로드
+
+### 배포 URL
+- Railway: `https://lecturenote.up.railway.app`
+- Android APK (사이드로드): `package/LectureNote - Google Play package/LectureNote.apk`
+- Android AAB (Play Store): `package/LectureNote - Google Play package/LectureNote.aab`

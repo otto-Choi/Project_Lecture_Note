@@ -1,5 +1,26 @@
+# Secrets
 .env
+
+# Python
 __pycache__/
 *.pyc
-data/lecture.db
+*.pyo
+.venv/
+venv/
+
+# Database (runtime-generated; data/ dir itself is tracked via .gitkeep)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Example media files (large binaries)
 data/examples/
+
+# Android TWA package (large, separate build artifact)
+package/
+
+# Large presentation binaries (>100MB, exceeds GitHub limit)
+*.mp4
+docs/presentations/6차/렉처노트_6차발표.pptx
+docs/presentations/6차/렉처노트_6차발표_백업.pptx
+docs/presentations/7차/렉처노트_7차발표.pptx

@@ -1,7 +1,7 @@
 # LectureNote — 배포 및 포트폴리오 플랜
 
-> 목표: 로컬 시연 → Render 외부 배포 + GitHub 포트폴리오 아카이브  
-> 업데이트: 2026-05-15
+> 목표: 로컬 시연 → Railway 외부 배포 + GitHub 포트폴리오 아카이브  
+> 업데이트: 2026-06-07
 
 ---
 
@@ -14,7 +14,8 @@
 | AI | Gemini 2.5-flash | LLM 생성 + STT + 컨텍스트 분석 단일 API |
 | 인증 | 세션 토큰 (Bearer) | SHA256+salt 해시, 72h TTL, localStorage 자동 로그인 |
 | 프론트 | Vanilla HTML/CSS/JS | 멀티스크린 SPA (Auth / Main App / Profile) |
-| 배포 | Render | `https://lecture-note-2cb6.onrender.com` (무료 플랜, 15분 슬립) |
+| 배포 | Railway | `https://lecturenote.up.railway.app` |
+| 모바일 | PWABuilder TWA + Capacitor | APK/AAB 빌드 완료, appId: `com.cau.lecturenote` |
 
 이 구조는 현재 검증 단계에 맞게 의도적으로 경량화된 선택이다. Docker/K8s, PostgreSQL, React 빌드 파이프라인은 현재 운영 규모에서 불필요한 복잡도를 추가할 뿐이다. 트래픽 검증 이후 단계적 전환이 올바른 순서다.
 
@@ -182,15 +183,16 @@ web: uvicorn main:app --host 0.0.0.0 --port $PORT --app-dir src
 
 ```
 1. 위 필수 수정 항목 적용 확인
-2. GitHub repo push (.env 제외 확인)
-3. render.com → New Web Service → Deploy from GitHub
-4. Render 대시보드: Environment → GEMINI_API_KEY 입력
+2. GitHub repo push (.env, package/ 제외 확인)
+3. railway.com → New Project → Deploy from GitHub
+4. Railway 대시보드: Variables → GEMINI_API_KEY 입력
 5. 배포 완료 후 /health 접속 확인
 6. 발급된 URL로 외부 접속 테스트
-7. (선택) manifest.json 추가 → PWA 설치 배너 확인
+7. TWA 도메인 연결 시: assetlinks.json을 /.well-known/assetlinks.json 로 서빙
 
-※ 현재 배포 URL: https://lecture-note-2cb6.onrender.com (render.yaml 기반 자동 배포)
-※ Render 무료 플랜: 15분 비활성 시 슬립 → 최초 요청 약 30초 콜드 스타트
+※ 현재 배포 URL: https://lecturenote.up.railway.app (Railway 자동 배포)
+※ 모바일: PWABuilder TWA 빌드 완료 (APK + AAB), appId: com.cau.lecturenote
+※ 서명 키스토어: package/LectureNote - Google Play package/signing.keystore (커밋 금지)
 ```
 
 ---
@@ -219,49 +221,14 @@ web: uvicorn main:app --host 0.0.0.0 --port $PORT --app-dir src
 
 ---
 
-### 포트폴리오용 작업 목록
+### 포트폴리오용 작업 목록 (완료)
 
-#### P1. 슬라이드 기능 카드 명칭 교체 (10분)
-
-| 현재 | 교체 후 |
+| 과제 | 상태 |
 |---|---|
-| 모바일 앱 스타일 UI | Multi-source Ingestion Layer |
-| 원클릭 강의 등록 | Context-Aware Curriculum Analysis (Step 0) |
-| 실시간 스트리밍 노트 생성 | Streaming LLM Orchestration (SSE) |
+| P1. 슬라이드 기능 카드 명칭 파이프라인 용어로 교체 | ✅ 완료 |
+| P2. 아키텍처 다이어그램 추가 | ✅ README에 ASCII 다이어그램 포함 |
+| P3. 파이프라인 스텝 인디케이터 UI | ✅ 앱 내 구현 완료 |
+| P4. 노트 완료 후 처리 메타데이터 표시 | 대기 |
+| P5. GitHub README 재작성 | ✅ 완료 — [README.md](../README.md) |
 
-#### P2. 아키텍처 다이어그램 슬라이드 추가 (1시간)
-
-기술 스택 슬라이드 다음에 Ingestion → Processing → Output 흐름 다이어그램 한 장 추가. 면접관이 가장 먼저 찾는 슬라이드. 구현과 무관하게 "설계를 이해하는 사람"으로 포지셔닝된다.
-
-#### P3. 파이프라인 스텝 인디케이터 UI (2~3시간)
-
-```
-  ① Audio Ingestion       ✓ 완료
-  ② Speech-to-Text        ⟳ 처리 중...
-  ③ Source Aggregation    ─
-  ④ Context Injection     ─
-  ⑤ Note Generation       ─
-```
-
-기존 STT 완료 → SSE 시작 로직에 상태 변수만 추가하면 된다. 스크린샷이 포트폴리오 첨부 자료로 즉시 활용 가능.
-
-#### P4. 노트 완료 후 처리 메타데이터 표시 (1시간)
-
-```
-소스: 음성(23분) + 강의 슬라이드(18p) + 커리큘럼 컨텍스트
-처리 시간: 34초  |  생성 섹션: 5개
-```
-
-백엔드에 이미 데이터가 있다. 프론트 렌더링만 추가하면 된다.
-
-#### P5. GitHub README 재작성 (30분)
-
-이미 이 디렉토리의 [README.md](README.md)에 초안 작성됨. 그대로 GitHub 루트 README로 이식 가능.
-
-| 과제 | 공수 | 효과 |
-|---|---|---|
-| P1. 슬라이드 카드 명칭 교체 | 10분 | 기술 이해도 인상 |
-| P2. 아키텍처 다이어그램 추가 | 1시간 | "설계자" 포지셔닝 — 가장 큰 효과 |
-| P3. 파이프라인 인디케이터 UI | 2~3시간 | 서비스 완성도 + 스크린샷 자료 |
-| P4. 처리 메타데이터 표시 | 1시간 | 기술적 디테일 어필 |
-| P5. GitHub README | 30분 | GitHub 첫인상 결정 |
+> 추가 완료: 프로젝트 구조 재편 (`src/prompts/` 분리, `docs/` 정리), 스크린샷 섹션 추가
