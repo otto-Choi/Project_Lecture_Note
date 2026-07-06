@@ -11,7 +11,7 @@
 | 담당 범위 | End-to-End (아키텍처 설계·전체 구현) |
 | 핵심 역량 | LLM 파이프라인 · Context Orchestration · FastAPI/SSE |
 
-**Live Demo** · [lecturenote.up.railway.app](https://lecturenote.up.railway.app) &nbsp;|&nbsp; **Android** · Google Play 심사 통과·비공개 테스트 전 단계
+**Live Demo** · [lecture-note-2cb6.onrender.com](https://lecture-note-2cb6.onrender.com) &nbsp;|&nbsp; **Android** · Google Play 심사 통과·비공개 테스트 전 단계
 
 ---
 
