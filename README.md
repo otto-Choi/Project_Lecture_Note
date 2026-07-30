@@ -11,7 +11,7 @@
 | 담당 범위 | End-to-End (아키텍처 설계·전체 구현) |
 | 핵심 역량 | LLM 파이프라인 · Context Orchestration · FastAPI/SSE |
 
-**Live Demo** · [lecture-note-2cb6.onrender.com](https://lecture-note-2cb6.onrender.com) &nbsp;|&nbsp; **Android** · Google Play 심사 통과·비공개 테스트 전 단계
+**Live Demo** · [lecture-note-2cb6.onrender.com](https://lecture-note-2cb6.onrender.com) &nbsp;|&nbsp; **Android** · Google Play 비공개 테스트 직전 단계
 
 ---
 
@@ -157,7 +157,7 @@ Phase 2에서 Step 0 컨텍스트는 항상 주입된다. LLM은 단순 요약�
 - **Context Architecture 프레이밍** — prompt engineering이 아닌 *사전 구축 맥락 주입* 문제로 재정의. 이 재정의가 Full RAG 대비 Simplified RAG 채택의 근거 (핵심 IP)
 - **이중 단계 아키텍처** — Phase 1(Step 0 도메인 구조 추출) / Phase 2(SSE 스트리밍 생성) 분리 설계
 - **멀티소스 어그리게이터** — typed context block 우선순위 구조 · Step 0 사전 기반 STT 오인식 자동 교정 로직
-- **풀스택 구현·실서비스화** — FastAPI + SSE + SQLite 전체 구현 → 웹 배포(Railway) → 안드로이드 앱 이식 → **Google Play 심사 통과·정식 배포**
+- **풀스택 구현·실서비스화** — FastAPI + SSE + SQLite 전체 구현 → 웹 배포(Railway, Render) → 안드로이드 앱 이식 → **Google Play 비공개 테스트 직전 단계**
 
 ---
 
